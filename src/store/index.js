@@ -3,13 +3,13 @@ import { persist } from 'zustand/middleware'
 
 // ── SEED PRODUCTS ────────────────────────────────────────────────
 const SEED_PRODUCTS = [
-  { id:1,  name:'AMD Ryzen 5 5600X',         category:'Processors',  price:9500,  costPrice:7200, stock:12, barcode:'CPU-001', icon:'💻', sold:24 },
-  { id:2,  name:'Intel Core i5-12400',        category:'Processors',  price:10500, costPrice:8000, stock:8,  barcode:'CPU-002', icon:'💻', sold:18 },
-  { id:3,  name:'AMD Ryzen 7 5800X',          category:'Processors',  price:15000, costPrice:11500,stock:5,  barcode:'CPU-003', icon:'💻', sold:12 },
-  { id:4,  name:'Kingston 8GB DDR4 3200MHz',  category:'RAM',         price:1800,  costPrice:1300, stock:20, barcode:'RAM-001', icon:'🧩', sold:35 },
-  { id:5,  name:'Corsair 16GB DDR4 3200MHz',  category:'RAM',         price:3200,  costPrice:2400, stock:15, barcode:'RAM-002', icon:'🧩', sold:28 },
-  { id:6,  name:'NVIDIA RTX 3060 12GB',       category:'GPU',         price:22000, costPrice:17000,stock:4,  barcode:'GPU-001', icon:'🎮', sold:8  },
-  { id:7,  name:'AMD RX 6600 8GB',            category:'GPU',         price:16500, costPrice:12500,stock:6,  barcode:'GPU-002', icon:'🎮', sold:11 },
+  { id:1,  name:'AMD Ryzen 5 5600X',         category:'Processors',  price:9500,  costPrice:7200, stock:12, barcode:'CPU-001', icon:'💻', sold:24, createdAt:'2024-01-10', lastSoldAt:'2025-03-15' },
+  { id:2,  name:'Intel Core i5-12400',        category:'Processors',  price:10500, costPrice:8000, stock:8,  barcode:'CPU-002', icon:'💻', sold:18, createdAt:'2024-01-15', lastSoldAt:'2025-04-10' },
+  { id:3,  name:'AMD Ryzen 7 5800X',          category:'Processors',  price:15000, costPrice:11500,stock:5,  barcode:'CPU-003', icon:'💻', sold:12, createdAt:'2023-11-20', lastSoldAt:'2025-02-28' },
+  { id:4,  name:'Kingston 8GB DDR4 3200MHz',  category:'RAM',         price:1800,  costPrice:1300, stock:20, barcode:'RAM-001', icon:'🧩', sold:35, createdAt:'2024-02-01', lastSoldAt:'2025-05-01' },
+  { id:5,  name:'Corsair 16GB DDR4 3200MHz',  category:'RAM',         price:3200,  costPrice:2400, stock:15, barcode:'RAM-002', icon:'🧩', sold:28, createdAt:'2024-02-05', lastSoldAt:'2025-04-20' },
+  { id:6,  name:'NVIDIA RTX 3060 12GB',       category:'GPU',         price:22000, costPrice:17000,stock:4,  barcode:'GPU-001', icon:'🎮', sold:8,  createdAt:'2023-10-01', lastSoldAt:'2025-01-15' },
+  { id:7,  name:'AMD RX 6600 8GB',            category:'GPU',         price:16500, costPrice:12500,stock:6,  barcode:'GPU-002', icon:'🎮', sold:11, createdAt:'2023-10-15', lastSoldAt:'2025-03-01' },
   { id:8,  name:'Samsung 500GB SSD SATA',     category:'Storage',     price:2800,  costPrice:2100, stock:18, barcode:'SSD-001', icon:'💾', sold:42 },
   { id:9,  name:'WD 1TB NVMe M.2',            category:'Storage',     price:4500,  costPrice:3400, stock:10, barcode:'SSD-002', icon:'💾', sold:19 },
   { id:10, name:'Seagate 2TB HDD',            category:'Storage',     price:2500,  costPrice:1900, stock:14, barcode:'HDD-001', icon:'💾', sold:23 },
@@ -19,8 +19,8 @@ const SEED_PRODUCTS = [
   { id:14, name:'USB-C Hub 7-in-1',           category:'Accessories', price:850,   costPrice:600,  stock:25, barcode:'ACC-001', icon:'🔌', sold:38 },
   { id:15, name:'HDMI Cable 2m',              category:'Accessories', price:350,   costPrice:220,  stock:30, barcode:'ACC-002', icon:'🔌', sold:55 },
   { id:16, name:'Thermal Paste Noctua',       category:'Accessories', price:480,   costPrice:320,  stock:22, barcode:'ACC-003', icon:'🛠️',sold:19 },
-  { id:17, name:'Laptop Acer Aspire 5',       category:'Laptops',     price:35000, costPrice:28000,stock:3,  barcode:'LAP-001', icon:'💻', sold:5  },
-  { id:18, name:'Laptop ASUS VivoBook',       category:'Laptops',     price:28000, costPrice:22000,stock:4,  barcode:'LAP-002', icon:'💻', sold:7  },
+  { id:17, name:'Laptop Acer Aspire 5',       category:'Laptops',     price:35000, costPrice:28000,stock:3,  barcode:'LAP-001', icon:'💻', sold:5,  createdAt:'2023-09-01', lastSoldAt:'2024-12-20' },
+  { id:18, name:'Laptop ASUS VivoBook',       category:'Laptops',     price:28000, costPrice:22000,stock:4,  barcode:'LAP-002', icon:'💻', sold:7,  createdAt:'2023-09-10', lastSoldAt:'2025-02-10' },
   { id:19, name:'PC Cleaning Service',        category:'Services',    price:350,   costPrice:0,    stock:99, barcode:'SVC-001', icon:'🛠️',sold:62 },
   { id:20, name:'OS Installation Win 11',     category:'Services',    price:500,   costPrice:0,    stock:99, barcode:'SVC-002', icon:'🖥️',sold:44 },
   { id:21, name:'RAM Upgrade Service',        category:'Services',    price:200,   costPrice:0,    stock:99, barcode:'SVC-003', icon:'🔧', sold:28 },
@@ -113,7 +113,7 @@ export const useCustomerStore = create(
       addPoints: (id, total) => set(s => ({
         customers: s.customers.map(c => c.id===id ? {
           ...c,
-          points: c.points + Math.floor(total/100),
+          points: c.points + 10 + Math.floor(total/100), // 10 pts per txn + 1 pt per 100 pesos
           purchases: c.purchases + 1,
           totalSpent: c.totalSpent + total,
         } : c)

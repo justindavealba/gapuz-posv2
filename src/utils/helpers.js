@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
 import { translations } from '../i18n/translations'
 
@@ -16,8 +16,8 @@ export const stockStatus = (stock) => {
 }
 
 export const getTier = (points) => {
-  if(points>=3000) return {label:'Platinum',color:'#e0e7ff',icon:'💎'}
-  if(points>=1500) return {label:'Gold',    color:'#fbbf24',icon:'🥇'}
+  if(points>=3000) return {label:'Platinum',color:'#8b5cf6',icon:'💎'}
+  if(points>=1500) return {label:'Gold',    color:'#eab308',icon:'🥇'}
   if(points>=500)  return {label:'Silver',  color:'#94a3b8',icon:'🥈'}
   return                  {label:'Bronze',  color:'#b45309',icon:'🥉'}
 }
@@ -29,6 +29,17 @@ export const CAT_COLORS = { Processors:'badge-blue',RAM:'badge-purple',GPU:'badg
 export const useT = () => {
   const lang = useAppStore(s=>s.language)
   return (key) => translations[lang]?.[key] || translations['en']?.[key] || key
+}
+
+// Breakpoints: <=860px = mobile (stacked layouts, drawer nav), <=1180px = tablet (narrower panels)
+export const useBreakpoint = () => {
+  const [width, setWidth] = useState(typeof window!=='undefined' ? window.innerWidth : 1280)
+  useEffect(()=>{
+    const onResize = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  },[])
+  return { width, isMobile: width<=860, isTablet: width>860&&width<=1180 }
 }
 
 export const useKeyboardShortcuts = (shortcuts) => {

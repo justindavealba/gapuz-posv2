@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useCartStore, useAuthStore, useTransactionStore, useProductStore, useCustomerStore } from '../store'
-import { peso, fmtTxnId, useT } from '../utils/helpers'
+import { peso, fmtTxnId, useT, useBreakpoint } from '../utils/helpers'
 import { useToast } from '../utils/toast'
 import Receipt from './Receipt'
 
@@ -17,6 +17,7 @@ export default function Cart({ products, customers, onHold }) {
   const addPoints      = useCustomerStore(s=>s.addPoints)
   const toast = useToast()
   const t     = useT()
+  const { isMobile } = useBreakpoint()
 
   const [cashGiven,   setCashGiven]   = useState('')
   const [showReceipt, setShowReceipt] = useState(false)
@@ -54,7 +55,7 @@ export default function Cart({ products, customers, onHold }) {
   const border = '1px solid var(--border)'
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',background:'var(--bg2)',borderLeft:border}}>
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:'var(--bg2)',borderLeft:isMobile?'none':border,borderTop:isMobile?border:'none'}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:border,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -63,7 +64,7 @@ export default function Cart({ products, customers, onHold }) {
         </div>
         <div style={{display:'flex',gap:6}}>
           {onHold&&items.length>0&&<button onClick={onHold} style={{padding:'4px 10px',borderRadius:7,border:'1px solid var(--border2)',background:'var(--bg3)',color:'var(--text2)',cursor:'pointer',fontSize:11,fontWeight:600}}>⏸ Hold</button>}
-          {items.length>0&&<button onClick={clearCart} style={{padding:'4px 10px',borderRadius:7,border:'1px solid rgba(248,113,113,0.25)',background:'rgba(248,113,113,0.08)',color:'var(--red)',cursor:'pointer',fontSize:11,fontWeight:600}}>{t('clear')}</button>}
+          {items.length>0&&<button onClick={clearCart} style={{padding:'4px 10px',borderRadius:7,border:'1px solid rgba(239,68,68,0.25)',background:'rgba(239,68,68,0.08)',color:'var(--red)',cursor:'pointer',fontSize:11,fontWeight:600}}>{t('clear')}</button>}
         </div>
       </div>
 
@@ -77,7 +78,16 @@ export default function Cart({ products, customers, onHold }) {
               <div key={item.id} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',marginBottom:6}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:8}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.icon} {item.name}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      <div style={{width:24,height:24,borderRadius:6,background:'var(--bg4)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,border:'1px solid var(--border)'}}>
+                        {item.image && (item.image.startsWith('data:') || item.image.startsWith('http')) ? (
+                          <img src={item.image} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
+                        ) : (
+                          <span style={{fontSize:12}}>{item.image || '📦'}</span>
+                        )}
+                      </div>
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{item.name}</span>
+                    </div>
                     <div style={{fontSize:10,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{peso(item.price)} each</div>
                   </div>
                   <button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:18,lineHeight:1}} onMouseEnter={e=>e.target.style.color='var(--red)'} onMouseLeave={e=>e.target.style.color='var(--text3)'}>×</button>
@@ -127,7 +137,7 @@ export default function Cart({ products, customers, onHold }) {
         </div>
 
         {/* Split toggle */}
-        <button onClick={()=>setSplitMode(!splitMode)} style={{padding:6,borderRadius:8,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',...(splitMode?{borderColor:'var(--accent)',background:'rgba(209,231,81,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text3)'})}}>
+        <button onClick={()=>setSplitMode(!splitMode)} style={{padding:6,borderRadius:8,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',...(splitMode?{borderColor:'var(--accent)',background:'rgba(52,211,153,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text3)'})}}>
           ⚡ {t('split_payment')} {splitMode?'(ON)':''}
         </button>
 
@@ -146,7 +156,7 @@ export default function Cart({ products, customers, onHold }) {
           : <>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:5}}>
                 {PAY.map(m=>(
-                  <button key={m.id} onClick={()=>setPayMethod(m.id)} style={{padding:'8px 4px',borderRadius:9,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',fontFamily:'inherit',...(payMethod===m.id?{borderColor:'var(--accent)',background:'rgba(209,231,81,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text2)'})}}>{m.label}</button>
+                  <button key={m.id} onClick={()=>setPayMethod(m.id)} style={{padding:'8px 4px',borderRadius:9,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',fontFamily:'inherit',...(payMethod===m.id?{borderColor:'var(--accent)',background:'rgba(52,211,153,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text2)'})}}>{m.label}</button>
                 ))}
               </div>
               {payMethod==='Cash'&&(
@@ -167,7 +177,7 @@ export default function Cart({ products, customers, onHold }) {
       {/* Receipt Modal */}
       {showReceipt&&(
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}}>
-          <div className="card animate-scale-in" style={{padding:24,width:360,maxHeight:'90vh',overflowY:'auto'}}>
+          <div className="card animate-scale-in" style={{padding:24,width:'min(360px,92vw)',maxHeight:'90vh',overflowY:'auto'}}>
             <div style={{textAlign:'center',fontWeight:700,fontSize:16,marginBottom:16,color:'var(--green)'}}>✅ {t('payment_success')}</div>
             <Receipt ref={receiptRef} txn={lastTxn} role={role}/>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:16}}>

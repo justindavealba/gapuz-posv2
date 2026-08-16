@@ -45,24 +45,9 @@ export default function Customers() {
         <div className="page-title">👥 {t('customers')}</div>
         <button onClick={openAdd} className="btn-primary">+ {t('add_customer')}</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,flexShrink:0}}>
-        {[
-          {label:'Total Customers',  value:customers.length,                                         color:'var(--accent)'},
-          {label:'Total Points',     value:customers.reduce((s,c)=>s+c.points,0).toLocaleString(),   color:'var(--yellow)'},
-          {label:'Platinum Members', value:customers.filter(c=>c.points>=3000).length,               color:'var(--blue)'},
-          {label:'Gold Members',     value:customers.filter(c=>c.points>=1500&&c.points<3000).length,color:'var(--yellow)'},
-        ].map(s=>(
-          <div key={s.label} className="card" style={{padding:16,borderTop:`2px solid ${s.color}`}}>
-            <div style={{fontSize:10,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>{s.label}</div>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:20,fontWeight:700,color:s.color}}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:8,flexShrink:0}}>
-        <div style={{position:'relative', maxWidth:280, flex:1}}>
-          <img src="/logo.png" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:'50%',objectFit:'cover',pointerEvents:'none'}} alt=""/>
-          <input className="input-field" style={{paddingLeft:40, width:'100%'}} placeholder="Search customers..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        </div>
+
+      <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap'}}>
+        <input className="input-field" style={{maxWidth:280,minWidth:180,flex:1}} placeholder="🔍 Search customers..." value={search} onChange={e=>setSearch(e.target.value)}/>
         <select className="select-field" value={sortBy} onChange={e=>setSortBy(e.target.value)}>
           <option value="name">Name A–Z</option>
           <option value="points">Most Points</option>
@@ -80,9 +65,9 @@ export default function Customers() {
                 <tr key={c.id}>
                   <td><div style={{display:'flex',alignItems:'center',gap:10}}>
                     <div style={{width:32,height:32,borderRadius:8,background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#0a0a0a',flexShrink:0}}>{c.name.charAt(0).toUpperCase()}</div>
-                    <div><div style={{fontSize:12,fontWeight:600}}>{c.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{c.email||'No email'}</div></div>
+                    <div><div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{c.name}</div><div style={{fontSize:11.5,color:'var(--text2)',marginTop:2}}>{c.email||'No email'}</div></div>
                   </div></td>
-                  <td style={{fontSize:11,color:'var(--text2)'}}>{c.phone||'—'}</td>
+                  <td style={{fontSize:12,color:'var(--text2)'}}>{c.phone||'—'}</td>
                   <td><span style={{fontSize:11,fontWeight:600,color:tier.color}}>{tier.icon} {tier.label}</span></td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--yellow)',fontWeight:600}}>{(c.points||0).toLocaleString()}</td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{c.purchases||0}</td>
@@ -103,7 +88,7 @@ export default function Customers() {
       {/* Add/Edit Modal */}
       {(modal==='add'||modal==='edit')&&(
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
-          <div className="card animate-scale-in" style={{width:420,padding:28}}>
+          <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:28}}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>{modal==='add'?`➕ ${t('add_customer')}`:`✏️ ${t('edit_customer')}`}</div>
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
               {[['name',t('full_name'),'Juan dela Cruz','text'],['email',t('email_addr'),'juan@email.com','email'],['phone',t('phone'),'0917-123-4567','text'],['address',t('address'),'Cagayan de Oro City','text']].map(([key,label,ph,type])=>(
@@ -118,18 +103,38 @@ export default function Customers() {
       {/* History Modal */}
       {modal==='history'&&(
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
-          <div className="card animate-scale-in" style={{width:520,padding:24,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+          <div className="card animate-scale-in" style={{width:'min(520px,92vw)',padding:24,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
               <div><div style={{fontSize:15,fontWeight:700}}>📋 {t('purchase_history')}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{selected?.name}</div></div>
               <button onClick={()=>setModal(null)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:20}}>×</button>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
               {[{label:'Loyalty Points',value:(selected?.points||0).toLocaleString(),color:'var(--yellow)'},{label:'Total Purchases',value:selected?.purchases||0,color:'var(--accent)'},{label:'Total Spent',value:peso(selected?.totalSpent||0),color:'var(--green)'}].map(s=>(
                 <div key={s.label} className="card-surface" style={{padding:12}}>
                   <div style={{fontSize:9.5,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>{s.label}</div>
                   <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:700,color:s.color}}>{s.value}</div>
                 </div>
               ))}
+            </div>
+            {/* Tier criteria */}
+            <div style={{marginBottom:12,padding:12,background:'var(--bg2)',borderRadius:10}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:8}}>🏅 Loyalty Tier Criteria</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:6}}>
+                {[
+                  {tier:'Bronze', range:'0–499',    color:'var(--accent)', icon:'🥉', current:(selected?.points||0)<500},
+                  {tier:'Silver', range:'500–1,499', color:'#94a3b8', icon:'🥈', current:(selected?.points||0)>=500&&(selected?.points||0)<1500},
+                  {tier:'Gold',   range:'1,500–2,999',color:'var(--yellow)', icon:'🥇', current:(selected?.points||0)>=1500&&(selected?.points||0)<3000},
+                  {tier:'Platinum',range:'3,000+',   color:'var(--purple)', icon:'💎', current:(selected?.points||0)>=3000},
+                ].map(t=>(
+                  <div key={t.tier} style={{padding:'8px 6px',borderRadius:8,textAlign:'center',background:t.current?'var(--bg3)':'transparent',border:t.current?`2px solid ${t.color}`:'1px solid var(--border)',transition:'all .2s'}}>
+                    <div style={{fontSize:16,marginBottom:3}}>{t.icon}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:t.color}}>{t.tier}</div>
+                    <div style={{fontSize:9,color:'var(--text3)',marginTop:2}}>{t.range} pts</div>
+                    {t.current&&<div style={{fontSize:8,color:t.color,marginTop:3,fontWeight:700}}>CURRENT</div>}
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:'var(--text3)',marginTop:8,textAlign:'center'}}>Points earned: 10 pts per transaction + 1 pt per ₱100 spent</div>
             </div>
             <div style={{flex:1,overflowY:'auto'}}>
               {custTxns.length===0?<div style={{textAlign:'center',padding:32,color:'var(--text3)'}}><div style={{fontSize:36,opacity:.2,marginBottom:8}}>🛒</div>{t('no_purchases')}</div>
@@ -141,7 +146,7 @@ export default function Customers() {
                     <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:'var(--green)'}}>{peso(tx.total)}</span>
                   </div>
                   <div style={{fontSize:11,color:'var(--text2)'}}>{(tx.items||[]).map(i=>`${i.name} ×${i.qty}`).join(' · ')}</div>
-                  <div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>{tx.payment} · +{Math.floor(tx.total/100)} pts earned</div>
+                  <div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>{tx.payment} · +{10 + Math.floor(tx.total/100)} pts earned (10 per txn + {Math.floor(tx.total/100)} pts from spending)</div>
                 </div>
               ))}
             </div>

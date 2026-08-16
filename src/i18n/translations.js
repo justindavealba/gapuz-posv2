@@ -8,6 +8,7 @@ export const translations = {
     customers:  'Customers',
     refunds:    'Refunds',
     logout:     'Logout',
+    returns:    'Returns',
 
     // Login
     welcome:    'Welcome Back',
@@ -169,6 +170,7 @@ export const translations = {
     customers:  'Mga Customer',
     refunds:    'Mga Refund',
     logout:     'Mag-logout',
+    returns:    'Mga Return',
 
     // Login
     welcome:    'Maligayang Pagbabalik',

@@ -10,10 +10,10 @@ export function ToastProvider({ children }) {
   },[])
   const icons = {success:'✅',error:'❌',info:'ℹ️',warning:'⚠️'}
   const colors = {
-    success:{border:'rgba(74,222,128,0.3)', color:'#4ade80'},
-    error:  {border:'rgba(248,113,113,0.3)',color:'#f87171'},
-    info:   {border:'rgba(209,231,81,0.3)', color:'#d1e751'},
-    warning:{border:'rgba(251,191,36,0.3)', color:'#fbbf24'},
+    success:{border:'rgba(34,197,94,0.3)', color:'var(--green)'},
+    error:  {border:'rgba(239,68,68,0.3)',color:'var(--red)'},
+    info:   {border:'rgba(52,211,153,0.3)', color:'var(--accent)'},
+    warning:{border:'rgba(234,179,8,0.3)', color:'var(--yellow)'},
   }
   return (
     <ToastCtx.Provider value={addToast}>
@@ -22,7 +22,7 @@ export function ToastProvider({ children }) {
         {toasts.map(t=>(
           <div key={t.id} className="animate-slide-in" style={{
             display:'flex',alignItems:'center',gap:10,padding:'11px 16px',
-            borderRadius:10,fontSize:13,boxShadow:'0 8px 32px rgba(0,0,0,0.5)',maxWidth:320,
+            borderRadius:6,fontSize:13,boxShadow:'0 2px 8px rgba(0,0,0,0.25)',maxWidth:320,
             background:'var(--bg2)',border:`1px solid ${colors[t.type]?.border}`,
           }}>
             <span>{icons[t.type]}</span>

@@ -10,6 +10,7 @@ import Products  from './pages/Products'
 import Reports   from './pages/Reports'
 import Customers from './pages/Customers'
 import Refunds   from './pages/Refunds'
+import Returns   from './pages/Returns'
 
 function Guard({ children, adminOnly=false }) {
   const { user, role } = useAuthStore()
@@ -20,31 +21,7 @@ function Guard({ children, adminOnly=false }) {
 
 export default function App() {
   const { theme } = useAppStore()
-  
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light')
-    document.title = 'Gapuz POS'
-
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = 64; canvas.height = 64
-      const ctx = canvas.getContext('2d')
-      ctx.beginPath()
-      ctx.arc(32, 32, 32, 0, Math.PI * 2)
-      ctx.clip()
-      ctx.drawImage(img, 0, 0, 64, 64)
-      let link = document.querySelector("link[rel~='icon']")
-      if (!link) {
-        link = document.createElement('link')
-        link.rel = 'icon'
-        document.head.appendChild(link)
-      }
-      link.href = canvas.toDataURL()
-    }
-    img.src = '/logo.png'
-  }, [theme])
-
+  useEffect(()=>{ document.documentElement.classList.toggle('light', theme==='light') },[theme])
   return (
     <ToastProvider>
       <BrowserRouter>
@@ -58,6 +35,7 @@ export default function App() {
             <Route path="reports"   element={<Guard adminOnly><Reports/></Guard>}/>
             <Route path="customers" element={<Customers/>}/>
             <Route path="refunds"   element={<Refunds/>}/>
+            <Route path="returns"   element={<Returns/>}/>
           </Route>
           <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>

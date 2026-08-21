@@ -6,7 +6,7 @@ import { useT, peso, stockStatus, genBarcode, CATEGORIES, CAT_COLORS } from '../
 const EMPTY = { name:'', category:'Processors', price:'', costPrice:'', stock:'', barcode:'', image:'' }
 
 export default function Products() {
-  const { products, addProduct, updateProduct, deleteProduct, restockProduct } = useProductStore()
+  const { products, loading, addProduct, updateProduct, deleteProduct, restockProduct } = useProductStore()
   const [search,    setSearch]    = useState('')
   const [catFilter, setCatFilter] = useState('All')
   const [sortBy,    setSortBy]    = useState('name')
@@ -103,7 +103,15 @@ export default function Products() {
           <table>
             <thead><tr>{['','Product','Category','Price','Cost','Profit','Stock','Sold','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {filtered.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:40,color:mutedText}}>{t('no_data')}</td></tr>
+              {loading?<tr><td colSpan={9} style={{textAlign:'center',padding:40,color:mutedText}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M21 12a9 9 0 1 1-9-9"/>
+                  </svg>
+                  Loading products…
+                </div>
+              </td></tr>
+              :filtered.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:40,color:mutedText}}>{t('no_data')}</td></tr>
               :filtered.map(p=>{
                 const profit=p.costPrice?((p.price-p.costPrice)/p.price*100).toFixed(1):'—'
                 const ss=stockStatus(p.stock)
@@ -121,18 +129,21 @@ export default function Products() {
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:bodyText}}>{p.costPrice?peso(p.costPrice):'—'}</td>
                   <td style={{fontSize:11,color:p.costPrice?'var(--green)':mutedText}}>{profit}{p.costPrice?'%':''}</td>
                   <td>
-                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                      <span className={`badge ${ss.cls}`} style={{fontSize:10}}>{ss.label}</span>
-                      {(() => {
-                        const now = new Date()
-                        const added = p.createdAt ? new Date(p.createdAt) : null
-                        const lastSold = p.lastSoldAt ? new Date(p.lastSoldAt) : null
-                        const daysSinceAdded = added ? Math.floor((now-added)/(1000*60*60*24)) : 0
-                        const daysSinceLastSold = lastSold ? Math.floor((now-lastSold)/(1000*60*60*24)) : 999
-                        if(daysSinceAdded <= 30) return <span style={{fontSize:9,padding:'2px 6px',borderRadius:99,background:'rgba(52,211,153,0.15)',color:'var(--accent)',fontWeight:700}}>🆕 New</span>
-                        if(daysSinceLastSold > 90) return <span style={{fontSize:9,padding:'2px 6px',borderRadius:99,background:'rgba(239,68,68,0.15)',color:'var(--red)',fontWeight:700}}>📦 Old Stock</span>
-                        return null
-                      })()}
+                    <div style={{display:'flex',flexDirection:'row',alignItems:'center',gap:6}}>
+                      <span style={{display:'inline-flex',alignItems:'baseline',gap:5,width:'fit-content',padding:'3px 9px 3px 7px',borderRadius:99,background:ss.bg,border:`1px solid ${ss.border}`}}>
+                        <span style={{width:6,height:6,borderRadius:'50%',background:ss.color,flexShrink:0,alignSelf:'center'}}/>
+                        {p.stock>0&&<span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:800,color:ss.color,lineHeight:1}}>{p.stock}</span>}
+                        <span style={{fontSize:10,fontWeight:600,color:ss.color,letterSpacing:'.01em'}}>{p.stock===0?'Out of stock':p.stock<=5?'left':'in stock'}{(() => {
+                          const now = new Date()
+                          const added = p.createdAt ? new Date(p.createdAt) : null
+                          const lastSold = p.lastSoldAt ? new Date(p.lastSoldAt) : null
+                          const daysSinceAdded = added ? Math.floor((now-added)/(1000*60*60*24)) : 0
+                          const daysSinceLastSold = lastSold ? Math.floor((now-lastSold)/(1000*60*60*24)) : 999
+                          if(daysSinceAdded <= 30) return ' (New)'
+                          if(daysSinceLastSold > 90) return ' (Old)'
+                          return ''
+                        })()}</span>
+                      </span>
                     </div>
                   </td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:mutedText}}>{p.sold||0}</td>
@@ -148,7 +159,7 @@ export default function Products() {
         </div>
       </div>
       {(modal==='add'||modal==='edit')&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'#000'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
           <div className="card animate-scale-in" style={{width:'min(480px,92vw)',padding:28,maxHeight:'90vh',overflowY:'auto'}}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>{modal==='add'?`➕ ${t('add_product')}`:`✏️ ${t('edit_product')}`}</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:14}}>

@@ -66,12 +66,11 @@ export default function Login() {
   const { isMobile } = useBreakpoint()
 
   const handleLogin = async (u = username, p = password) => {
-    if (!u || !p) return toast('Please enter username and password', 'error')
+    if (!u || !p) return toast('Please enter your email and password', 'error')
     setLoading(true)
-    await new Promise(r => setTimeout(r, 400))
-    const ok = login(u, p)
+    const ok = await login(u, p)
     if (ok) { toast('Welcome back! 👋', 'success'); navigate('/pos') }
-    else    { toast('Invalid username or password', 'error') }
+    else    { toast('Invalid email or password', 'error') }
     setLoading(false)
   }
 
@@ -144,10 +143,10 @@ export default function Login() {
           {/* Fields */}
           <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:24 }}>
             <div>
-              <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--text3)', marginBottom:7, textTransform:'uppercase', letterSpacing:'.6px' }}>Username</label>
-              <input className="input-field" type="text" value={username}
+              <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--text3)', marginBottom:7, textTransform:'uppercase', letterSpacing:'.6px' }}>Email</label>
+              <input className="input-field" type="email" value={username}
                      onChange={e=>setUsername(e.target.value)}
-                     placeholder="Enter username"
+                     placeholder="you@email.com"
                      onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
             </div>
             <div>

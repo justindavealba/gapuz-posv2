@@ -31,13 +31,20 @@ function ProductCard({ product, onAdd, isLight, bodyText }) {
       </div>
       <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:6,lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:34}}>{name}</div>
       <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:700,color:bodyText}}>{peso(price)}</div>
-      <div style={{fontSize:10,color:isLow?'var(--yellow)':mutedText,marginTop:3}}>{isOut?'Out of stock':isLow?`⚠ ${stock} left`:`${stock} in stock`}</div>
+      <div style={{display:'inline-flex',alignItems:'baseline',gap:5,marginTop:6,padding:'3px 9px 3px 7px',borderRadius:99,
+        background:isOut?'rgba(239,68,68,0.1)':isLow?'rgba(234,179,8,0.1)':'rgba(52,211,153,0.1)',
+        border:`1px solid ${isOut?'rgba(239,68,68,0.22)':isLow?'rgba(234,179,8,0.22)':'rgba(52,211,153,0.2)'}`}}>
+        <span style={{width:6,height:6,borderRadius:'50%',background:isOut?'var(--red)':isLow?'var(--yellow)':'var(--green)',flexShrink:0,alignSelf:'center'}}/>
+        {!isOut&&<span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:800,color:isLow?'var(--yellow)':'var(--green)',lineHeight:1}}>{stock}</span>}
+        <span style={{fontSize:10,fontWeight:600,color:isOut?'var(--red)':isLow?'var(--yellow)':mutedText,letterSpacing:'.01em'}}>{isOut?'Out of stock':isLow?'left':'in stock'}</span>
+      </div>
     </div>
   )
 }
 
 export default function POS() {
   const products   = useProductStore(s=>s.products)
+  const loading    = useProductStore(s=>s.loading)
   const customers  = useCustomerStore(s=>s.customers)
   const { theme }    = useAppStore()
   const { items, addItem, clearCart, setCustomer } = useCartStore()
@@ -125,7 +132,18 @@ export default function POS() {
 
         {/* Products grid */}
         <div style={{flex:1,overflowY:'auto'}}>
-          {filtered.length===0
+          {loading
+            ? <div style={{display:'grid',gap:10,gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?120:148}px,1fr))`,alignContent:'start'}}>
+                {Array.from({length:isMobile?8:15}).map((_,i)=>(
+                  <div key={i} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:14}}>
+                    <div className="skeleton" style={{width:'100%',height:80,borderRadius:8,marginBottom:10}}/>
+                    <div className="skeleton" style={{height:11,marginBottom:6}}/>
+                    <div className="skeleton" style={{width:'60%',height:11,marginBottom:6}}/>
+                    <div className="skeleton" style={{width:'40%',height:9}}/>
+                  </div>
+                ))}
+              </div>
+          : filtered.length===0
             ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:mutedText,gap:8}}><span style={{fontSize:40,opacity:.2}}>📦</span><span>{t('no_data')}</span></div>
             : <div style={{display:'grid',gap:10,gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?120:148}px,1fr))`,alignContent:'start'}}>
                 {filtered.map(p=><ProductCard key={p.id} product={p} onAdd={handleAdd} isLight={isLight} bodyText={bodyText}/>)}

@@ -4,6 +4,8 @@ import { useAuthStore, useAppStore } from './store'
 import { ToastProvider } from './utils/toast'
 import Login     from './pages/Login'
 import Layout    from './components/Layout'
+import AppSkeleton from './components/AppSkeleton'
+import LoginSkeleton from './components/LoginSkeleton'
 import POS       from './pages/POS'
 import Dashboard from './pages/Dashboard'
 import Products  from './pages/Products'
@@ -21,7 +23,15 @@ function Guard({ children, adminOnly=false }) {
 
 export default function App() {
   const { theme } = useAppStore()
+  const init = useAuthStore(s=>s.init)
+  const initialized = useAuthStore(s=>s.initialized)
   useEffect(()=>{ document.documentElement.classList.toggle('light', theme==='light') },[theme])
+  useEffect(()=>{ init() },[init])
+
+  if (!initialized) {
+    return window.location.pathname === '/login' ? <LoginSkeleton/> : <AppSkeleton/>
+  }
+
   return (
     <ToastProvider>
       <BrowserRouter>

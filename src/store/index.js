@@ -1,162 +1,295 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { supabase } from '../lib/supabaseClient'
 
-// ── SEED PRODUCTS ────────────────────────────────────────────────
-const SEED_PRODUCTS = [
-  { id:1,  name:'AMD Ryzen 5 5600X',         category:'Processors',  price:9500,  costPrice:7200, stock:12, barcode:'CPU-001', icon:'💻', sold:24, createdAt:'2024-01-10', lastSoldAt:'2025-03-15' },
-  { id:2,  name:'Intel Core i5-12400',        category:'Processors',  price:10500, costPrice:8000, stock:8,  barcode:'CPU-002', icon:'💻', sold:18, createdAt:'2024-01-15', lastSoldAt:'2025-04-10' },
-  { id:3,  name:'AMD Ryzen 7 5800X',          category:'Processors',  price:15000, costPrice:11500,stock:5,  barcode:'CPU-003', icon:'💻', sold:12, createdAt:'2023-11-20', lastSoldAt:'2025-02-28' },
-  { id:4,  name:'Kingston 8GB DDR4 3200MHz',  category:'RAM',         price:1800,  costPrice:1300, stock:20, barcode:'RAM-001', icon:'🧩', sold:35, createdAt:'2024-02-01', lastSoldAt:'2025-05-01' },
-  { id:5,  name:'Corsair 16GB DDR4 3200MHz',  category:'RAM',         price:3200,  costPrice:2400, stock:15, barcode:'RAM-002', icon:'🧩', sold:28, createdAt:'2024-02-05', lastSoldAt:'2025-04-20' },
-  { id:6,  name:'NVIDIA RTX 3060 12GB',       category:'GPU',         price:22000, costPrice:17000,stock:4,  barcode:'GPU-001', icon:'🎮', sold:8,  createdAt:'2023-10-01', lastSoldAt:'2025-01-15' },
-  { id:7,  name:'AMD RX 6600 8GB',            category:'GPU',         price:16500, costPrice:12500,stock:6,  barcode:'GPU-002', icon:'🎮', sold:11, createdAt:'2023-10-15', lastSoldAt:'2025-03-01' },
-  { id:8,  name:'Samsung 500GB SSD SATA',     category:'Storage',     price:2800,  costPrice:2100, stock:18, barcode:'SSD-001', icon:'💾', sold:42 },
-  { id:9,  name:'WD 1TB NVMe M.2',            category:'Storage',     price:4500,  costPrice:3400, stock:10, barcode:'SSD-002', icon:'💾', sold:19 },
-  { id:10, name:'Seagate 2TB HDD',            category:'Storage',     price:2500,  costPrice:1900, stock:14, barcode:'HDD-001', icon:'💾', sold:23 },
-  { id:11, name:'ASUS 24" FHD Monitor',       category:'Peripherals', price:8500,  costPrice:6500, stock:7,  barcode:'MON-001', icon:'🖥️',sold:15 },
-  { id:12, name:'Mechanical Keyboard RGB',    category:'Peripherals', price:2200,  costPrice:1600, stock:12, barcode:'KEY-001', icon:'⌨️',sold:31 },
-  { id:13, name:'Logitech Wireless Mouse',    category:'Peripherals', price:1200,  costPrice:900,  stock:20, barcode:'MOU-001', icon:'🖱️',sold:47 },
-  { id:14, name:'USB-C Hub 7-in-1',           category:'Accessories', price:850,   costPrice:600,  stock:25, barcode:'ACC-001', icon:'🔌', sold:38 },
-  { id:15, name:'HDMI Cable 2m',              category:'Accessories', price:350,   costPrice:220,  stock:30, barcode:'ACC-002', icon:'🔌', sold:55 },
-  { id:16, name:'Thermal Paste Noctua',       category:'Accessories', price:480,   costPrice:320,  stock:22, barcode:'ACC-003', icon:'🛠️',sold:19 },
-  { id:17, name:'Laptop Acer Aspire 5',       category:'Laptops',     price:35000, costPrice:28000,stock:3,  barcode:'LAP-001', icon:'💻', sold:5,  createdAt:'2023-09-01', lastSoldAt:'2024-12-20' },
-  { id:18, name:'Laptop ASUS VivoBook',       category:'Laptops',     price:28000, costPrice:22000,stock:4,  barcode:'LAP-002', icon:'💻', sold:7,  createdAt:'2023-09-10', lastSoldAt:'2025-02-10' },
-  { id:19, name:'PC Cleaning Service',        category:'Services',    price:350,   costPrice:0,    stock:99, barcode:'SVC-001', icon:'🛠️',sold:62 },
-  { id:20, name:'OS Installation Win 11',     category:'Services',    price:500,   costPrice:0,    stock:99, barcode:'SVC-002', icon:'🖥️',sold:44 },
-  { id:21, name:'RAM Upgrade Service',        category:'Services',    price:200,   costPrice:0,    stock:99, barcode:'SVC-003', icon:'🔧', sold:28 },
-  { id:22, name:'Data Backup Service',        category:'Services',    price:300,   costPrice:0,    stock:99, barcode:'SVC-004', icon:'💾', sold:19 },
-]
+// ── AUTH STORE (Supabase Auth + profiles table) ───────────────────
+export const useAuthStore = create((set, get) => ({
+  user: null,
+  role: null,
+  initialized: false,
 
-// ── AUTH STORE ───────────────────────────────────────────────────
-const USERS = [
-  { id:1, username:'admin',   password:'admin123',   role:'admin',   name:'Gapuz Admin'   },
-  { id:2, username:'cashier', password:'cashier123', role:'cashier', name:'Cashier'       },
-]
+  _loadProfile: async (authUser) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', authUser.id)
+      .single()
+    set({
+      user: { ...authUser, user_metadata: { ...authUser.user_metadata, name: profile?.name } },
+      role: profile?.role || 'cashier',
+    })
+  },
 
-export const useAuthStore = create(
-  persist(
-    (set) => ({
-      user: null,
-      role: null,
-      login: (username, password) => {
-        const found = USERS.find(u => u.username === username && u.password === password)
-        if (found) { set({ user: found, role: found.role }); return true }
-        return false
-      },
-      logout: () => set({ user: null, role: null }),
-    }),
-    { name: 'gapuz-auth', partialize: s => ({ user: s.user, role: s.role }) }
-  )
-)
+  init: async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) await get()._loadProfile(session.user)
+    set({ initialized: true })
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) get()._loadProfile(session.user)
+      else set({ user: null, role: null })
+    })
+  },
 
-// ── APP STORE (theme, language, sidebar) ─────────────────────────
+  login: async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.user) return false
+    await get()._loadProfile(data.user)
+    return true
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut()
+    set({ user: null, role: null })
+  },
+}))
+
+// ── APP STORE (theme, language, sidebar — local UI prefs only) ────
 export const useAppStore = create(
   persist(
     (set, get) => ({
       theme: 'dark',
       language: 'en',
-      sidebarCollapsed: false,
       toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark'
         document.documentElement.classList.toggle('light', next === 'light')
         set({ theme: next })
       },
       toggleLanguage: () => set(s => ({ language: s.language === 'en' ? 'fil' : 'en' })),
-      toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
     }),
-    { name: 'gapuz-app', partialize: s => ({ theme: s.theme, language: s.language, sidebarCollapsed: s.sidebarCollapsed }) }
+    { name: 'gapuz-app', partialize: s => ({ theme: s.theme, language: s.language }) }
   )
 )
 
 // ── PRODUCT STORE ────────────────────────────────────────────────
-let prodId = 23
-export const useProductStore = create(
-  persist(
-    (set, get) => ({
-      products: SEED_PRODUCTS,
-      addProduct: (data) => {
-        const p = { ...data, id: prodId++, sold: 0 }
-        set(s => ({ products: [...s.products, p] }))
-        return p
-      },
-      updateProduct: (id, data) => set(s => ({ products: s.products.map(p => p.id===id ? {...p,...data} : p) })),
-      deleteProduct: (id) => set(s => ({ products: s.products.filter(p => p.id!==id) })),
-      deductStock: (items) => set(s => ({
-        products: s.products.map(p => {
-          const ci = items.find(i => i.id===p.id)
-          return ci ? { ...p, stock: Math.max(0, p.stock-ci.qty), sold: (p.sold||0)+ci.qty } : p
-        })
-      })),
-      restockProduct: (id, qty) => set(s => ({ products: s.products.map(p => p.id===id ? {...p, stock:p.stock+qty} : p) })),
-    }),
-    { name: 'gapuz-products' }
-  )
-)
+const PRODUCT_SELECT = 'id:product_id, name, category, price, costPrice:cost_price, stock, barcode, icon, image, sold, createdAt:created_at, lastSoldAt:last_sold_at'
+
+export const useProductStore = create((set, get) => ({
+  products: [],
+  loading: false,
+
+  fetchProducts: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase.from('products').select(PRODUCT_SELECT).order('name')
+    if (!error) set({ products: data, loading: false })
+    else set({ loading: false })
+  },
+
+  addProduct: async (data) => {
+    const row = { name: data.name, category: data.category, price: data.price, cost_price: data.costPrice, stock: data.stock, barcode: data.barcode, icon: data.icon, image: data.image }
+    const { data: inserted, error } = await supabase.from('products').insert(row).select(PRODUCT_SELECT).single()
+    if (error || !inserted) return null
+    set(s => ({ products: [...s.products, inserted] }))
+    return inserted
+  },
+
+  updateProduct: async (id, data) => {
+    const row = {}
+    if ('name' in data) row.name = data.name
+    if ('category' in data) row.category = data.category
+    if ('price' in data) row.price = data.price
+    if ('costPrice' in data) row.cost_price = data.costPrice
+    if ('stock' in data) row.stock = data.stock
+    if ('barcode' in data) row.barcode = data.barcode
+    if ('icon' in data) row.icon = data.icon
+    if ('image' in data) row.image = data.image
+    const { error } = await supabase.from('products').update(row).eq('product_id', id)
+    if (!error) set(s => ({ products: s.products.map(p => p.id === id ? { ...p, ...data } : p) }))
+  },
+
+  deleteProduct: async (id) => {
+    const { error } = await supabase.from('products').delete().eq('product_id', id)
+    if (!error) set(s => ({ products: s.products.filter(p => p.id !== id) }))
+  },
+
+  deductStock: async (items) => {
+    set(s => ({
+      products: s.products.map(p => {
+        const ci = items.find(i => i.id === p.id)
+        return ci ? { ...p, stock: Math.max(0, p.stock - ci.qty), sold: (p.sold || 0) + ci.qty } : p
+      })
+    }))
+    for (const ci of items) {
+      const p = get().products.find(pp => pp.id === ci.id)
+      if (p) supabase.from('products').update({ stock: p.stock, sold: p.sold }).eq('product_id', ci.id)
+    }
+  },
+
+  restockProduct: async (id, qty) => {
+    const p = get().products.find(pp => pp.id === id)
+    const newStock = (p?.stock || 0) + qty
+    const { error } = await supabase.from('products').update({ stock: newStock }).eq('product_id', id)
+    if (!error) set(s => ({ products: s.products.map(p => p.id === id ? { ...p, stock: newStock } : p) }))
+  },
+}))
 
 // ── CUSTOMER STORE ───────────────────────────────────────────────
-let custId = 4
-export const useCustomerStore = create(
-  persist(
-    (set) => ({
-      customers: [
-        { id:1, name:'Juan dela Cruz',   email:'juan@email.com',   phone:'0917-111-1111', address:'CDO City', points:1520, purchases:12, totalSpent:45000, createdAt:'2024-01-15' },
-        { id:2, name:'Maria Santos',     email:'maria@email.com',  phone:'0918-222-2222', address:'CDO City', points:320,  purchases:4,  totalSpent:12000, createdAt:'2024-02-20' },
-        { id:3, name:'Pedro Reyes',      email:'pedro@email.com',  phone:'0919-333-3333', address:'CDO City', points:3200, purchases:28, totalSpent:98000, createdAt:'2023-11-10' },
-      ],
-      addCustomer: (data) => {
-        const c = { ...data, id: custId++, points:0, purchases:0, totalSpent:0, createdAt: new Date().toISOString().slice(0,10) }
-        set(s => ({ customers: [...s.customers, c] }))
-        return c
-      },
-      updateCustomer: (id, data) => set(s => ({ customers: s.customers.map(c => c.id===id ? {...c,...data} : c) })),
-      deleteCustomer: (id) => set(s => ({ customers: s.customers.filter(c => c.id!==id) })),
-      addPoints: (id, total) => set(s => ({
-        customers: s.customers.map(c => c.id===id ? {
-          ...c,
-          points: c.points + 10 + Math.floor(total/100), // 10 pts per txn + 1 pt per 100 pesos
-          purchases: c.purchases + 1,
-          totalSpent: c.totalSpent + total,
-        } : c)
-      })),
-    }),
-    { name: 'gapuz-customers' }
-  )
-)
+const CUSTOMER_SELECT = 'id:customer_id, name, email, phone, address, points, purchases, totalSpent:total_spent, createdAt:created_at'
+
+export const useCustomerStore = create((set, get) => ({
+  customers: [],
+  loading: false,
+
+  fetchCustomers: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase.from('customers').select(CUSTOMER_SELECT).order('name')
+    if (!error) set({ customers: data, loading: false })
+    else set({ loading: false })
+  },
+
+  addCustomer: async (data) => {
+    const row = { name: data.name, email: data.email, phone: data.phone, address: data.address }
+    const { data: inserted, error } = await supabase.from('customers').insert(row).select(CUSTOMER_SELECT).single()
+    if (error || !inserted) return null
+    set(s => ({ customers: [...s.customers, inserted] }))
+    return inserted
+  },
+
+  updateCustomer: async (id, data) => {
+    const row = {}
+    if ('name' in data) row.name = data.name
+    if ('email' in data) row.email = data.email
+    if ('phone' in data) row.phone = data.phone
+    if ('address' in data) row.address = data.address
+    const { error } = await supabase.from('customers').update(row).eq('customer_id', id)
+    if (!error) set(s => ({ customers: s.customers.map(c => c.id === id ? { ...c, ...data } : c) }))
+  },
+
+  deleteCustomer: async (id) => {
+    const { error } = await supabase.from('customers').delete().eq('customer_id', id)
+    if (!error) set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
+  },
+
+  addPoints: async (id, total) => {
+    const c = get().customers.find(cc => cc.id === id)
+    if (!c) return
+    const points = c.points + 10 + Math.floor(total / 100)
+    const purchases = c.purchases + 1
+    const totalSpent = c.totalSpent + total
+    const { error } = await supabase.from('customers').update({ points, purchases, total_spent: totalSpent }).eq('customer_id', id)
+    if (!error) set(s => ({ customers: s.customers.map(cc => cc.id === id ? { ...cc, points, purchases, totalSpent } : cc) }))
+  },
+
+  // Reverses stats credited by addPoints when a sale is refunded
+  revertPurchase: async (id, { refundTotal, fullRefund }) => {
+    const c = get().customers.find(cc => cc.id === id)
+    if (!c) return
+    const pointsDeducted = (fullRefund ? 10 : 0) + Math.floor(refundTotal / 100)
+    const points = Math.max(0, c.points - pointsDeducted)
+    const purchases = fullRefund ? Math.max(0, c.purchases - 1) : c.purchases
+    const totalSpent = Math.max(0, c.totalSpent - refundTotal)
+    const { error } = await supabase.from('customers').update({ points, purchases, total_spent: totalSpent }).eq('customer_id', id)
+    if (!error) set(s => ({ customers: s.customers.map(cc => cc.id === id ? { ...cc, points, purchases, totalSpent } : cc) }))
+  },
+}))
 
 // ── TRANSACTION STORE ────────────────────────────────────────────
-let txnId = 1
-export const useTransactionStore = create(
-  persist(
-    (set, get) => ({
-      transactions: [],
-      addTransaction: (txn) => {
-        const t = { ...txn, id: txnId++, createdAt: new Date().toISOString() }
-        set(s => ({ transactions: [t, ...s.transactions] }))
-        return t
-      },
-    }),
-    { name: 'gapuz-transactions' }
-  )
-)
+const TXN_SELECT = 'id:transaction_id, customerId:customer_id, customerName:customer_name, payment, subtotal, discAmt:disc_amt, vat, total, cashGiven:cash_given, status, cashierName:cashier_name, createdAt:created_at'
+
+export const useTransactionStore = create((set, get) => ({
+  transactions: [],
+  loading: false,
+
+  fetchTransactions: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`${TXN_SELECT}, items:transaction_items(id:product_id, name, price, qty)`)
+      .order('created_at', { ascending: false })
+    if (!error) set({ transactions: data, loading: false })
+    else set({ loading: false })
+  },
+
+  addTransaction: async (txn) => {
+    const row = {
+      customer_id: txn.customerId || null,
+      customer_name: txn.customerName || 'Walk-in',
+      payment: txn.payment,
+      subtotal: txn.subtotal,
+      disc_amt: txn.discAmt,
+      vat: txn.vat,
+      total: txn.total,
+      cash_given: txn.cashGiven,
+      status: txn.status,
+      cashier_name: txn.cashierName,
+    }
+    const { data: inserted, error } = await supabase.from('transactions').insert(row).select(TXN_SELECT).single()
+    if (error || !inserted) return null
+    const itemRows = txn.items.map(i => ({ transaction_id: inserted.id, product_id: i.id, name: i.name, qty: i.qty, price: i.price }))
+    await supabase.from('transaction_items').insert(itemRows)
+    const full = { ...inserted, items: txn.items }
+    set(s => ({ transactions: [full, ...s.transactions] }))
+    return full
+  },
+
+  updateTransaction: async (id, data) => {
+    const row = {}
+    if ('status' in data) row.status = data.status
+    const { error } = await supabase.from('transactions').update(row).eq('transaction_id', id)
+    if (!error) set(s => ({ transactions: s.transactions.map(tx => tx.id === id ? { ...tx, ...data } : tx) }))
+  },
+}))
 
 // ── REFUND STORE ─────────────────────────────────────────────────
-let refId = 1
-export const useRefundStore = create(
-  persist(
-    (set) => ({
-      refunds: [],
-      addRefund: (data) => {
-        const r = { ...data, id: refId++, createdAt: new Date().toISOString() }
-        set(s => ({ refunds: [r, ...s.refunds] }))
-        return r
-      },
-      updateRefund: (id, data) => set(s => ({ refunds: s.refunds.map(r => r.id===id ? {...r,...data} : r) })),
-    }),
-    { name: 'gapuz-refunds' }
-  )
-)
+const REFUND_SELECT = 'id:refund_id, transactionId:transaction_id, customerName:customer_name, reason, refundMethod:refund_method, notes, total, status, processedBy:processed_by, items, subtotal, vat, createdAt:created_at'
 
-// ── CART STORE ───────────────────────────────────────────────────
+export const useRefundStore = create((set, get) => ({
+  refunds: [],
+
+  fetchRefunds: async () => {
+    const { data, error } = await supabase.from('refunds').select(REFUND_SELECT).order('created_at', { ascending: false })
+    if (!error) set({ refunds: data })
+  },
+
+  addRefund: async (data) => {
+    const row = {
+      transaction_id: data.transactionId,
+      customer_name: data.customerName,
+      reason: data.reason,
+      refund_method: data.refundMethod,
+      notes: data.notes,
+      total: data.total,
+      status: data.status,
+      processed_by: data.processedBy,
+      items: data.items,
+    }
+    const { data: inserted, error } = await supabase.from('refunds').insert(row).select(REFUND_SELECT).single()
+    if (error || !inserted) return null
+    set(s => ({ refunds: [inserted, ...s.refunds] }))
+    return inserted
+  },
+
+  updateRefund: async (id, data) => {
+    const row = {}
+    if ('status' in data) row.status = data.status
+    const { error } = await supabase.from('refunds').update(row).eq('refund_id', id)
+    if (!error) set(s => ({ refunds: s.refunds.map(r => r.id === id ? { ...r, ...data } : r) }))
+  },
+}))
+
+// ── HOLD STORE ───────────────────────────────────────────────────
+const HOLD_SELECT = 'id:hold_id, label, items, customerId:customer_id, savedAt:saved_at'
+
+export const useHoldStore = create((set, get) => ({
+  holds: [],
+
+  fetchHolds: async () => {
+    const { data, error } = await supabase.from('holds').select(HOLD_SELECT).order('saved_at')
+    if (!error) set({ holds: data })
+  },
+
+  saveHold: async (label, items, customerId) => {
+    const row = { label, items, customer_id: customerId }
+    const { data: inserted, error } = await supabase.from('holds').insert(row).select(HOLD_SELECT).single()
+    if (!error) set(s => ({ holds: [...s.holds, inserted] }))
+  },
+
+  removeHold: async (id) => {
+    const { error } = await supabase.from('holds').delete().eq('hold_id', id)
+    if (!error) set(s => ({ holds: s.holds.filter(h => h.id !== id) }))
+  },
+}))
+
+// ── CART STORE (local session state — not persisted server-side) ──
 export const useCartStore = create((set, get) => ({
   items: [],
   discount: { value:0, type:'pct' },
@@ -200,17 +333,3 @@ export const useCartStore = create((set, get) => ({
     return { subtotal, discAmt, vat, total, totalInt: Math.round(total) }
   },
 }))
-
-// ── HOLD STORE ───────────────────────────────────────────────────
-export const useHoldStore = create(
-  persist(
-    (set) => ({
-      holds: [],
-      saveHold: (label, items, customerId) => set(s => ({
-        holds: [...s.holds, { id:Date.now(), label, items, customerId, savedAt:new Date().toISOString() }]
-      })),
-      removeHold: (id) => set(s => ({ holds: s.holds.filter(h=>h.id!==id) })),
-    }),
-    { name: 'gapuz-holds' }
-  )
-)

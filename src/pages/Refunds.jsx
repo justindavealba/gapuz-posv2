@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
-import { useRefundStore, useTransactionStore, useAuthStore, useProductStore, useAppStore } from '../store'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useRefundStore, useTransactionStore, useAuthStore, useProductStore, useCustomerStore, useAppStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, peso, fmtDate, fmtDateTime, REFUND_REASONS } from '../utils/helpers'
+import { useT, peso, fmtDate, fmtDateTime, REFUND_REASONS, useBreakpoint } from '../utils/helpers'
 
 const REFUND_METHODS = ['Cash', 'GCash', 'Store Credit']
 
@@ -40,9 +40,11 @@ export default function Refunds() {
   const toast = useToast()
   const { role, user } = useAuthStore()
   const { theme } = useAppStore()
-  const { transactions } = useTransactionStore()
+  const { isMobile, isTablet } = useBreakpoint()
+  const { transactions, updateTransaction } = useTransactionStore()
   const { products, restockProduct } = useProductStore()
   const { refunds, addRefund, updateRefund } = useRefundStore()
+  const { revertPurchase } = useCustomerStore()
 
   const isAdmin = role === 'admin'
   const [showPolicy, setShowPolicy] = useState(true)
@@ -53,13 +55,18 @@ export default function Refunds() {
   const [selectedTxn,   setSelectedTxn]  = useState(null)
   const [refundItems,   setRefundItems]  = useState({})
   const [filterStatus,  setFilterStatus] = useState('All')
+  const [dateSort,      setDateSort]     = useState('desc')
   const [details, setDetails] = useState({
     reason: REFUND_REASONS[0],
     method: 'Cash',
     notes: '',
   })
 
-  const filteredRefunds = refunds.filter(r => filterStatus === 'All' || r.status === filterStatus)
+  const filteredRefunds = refunds
+    .filter(r => filterStatus === 'All' || r.status === filterStatus)
+    .sort((a, b) => dateSort === 'desc'
+      ? new Date(b.createdAt) - new Date(a.createdAt)
+      : new Date(a.createdAt) - new Date(b.createdAt))
 
   const calcTotals = () => {
     if (!selectedTxn) return { subtotal: 0, vat: 0, total: 0 }
@@ -75,12 +82,37 @@ export default function Refunds() {
   const selectedCount = Object.values(refundItems).filter(r => r.selected).length
   const { subtotal, vat, total } = calcTotals()
 
+  // Marks the original transaction Refunded/Partially Refunded and reverses the
+  // customer's loyalty stats for an approved refund. Safe to call more than once —
+  // skips transactions that are already synced.
+  const syncRefundToTransaction = async (r) => {
+    const txn = transactions.find(tx => tx.id === r.transactionId)
+    if (!txn || txn.status === 'Refunded' || txn.status === 'Partially Refunded') return
+    const fullRefund = txn.items.every(item => {
+      const ri = r.items.find(i => i.id === item.id)
+      return ri && (ri.refundQty || ri.qty) >= item.qty
+    })
+    await updateTransaction(txn.id, { status: fullRefund ? 'Refunded' : 'Partially Refunded' })
+    if (txn.customerId) await revertPurchase(txn.customerId, { refundTotal: r.total, fullRefund })
+  }
+
+  // One-time reconciliation for refunds that were approved before this sync existed.
+  const reconciled = useRef(false)
+  useEffect(() => {
+    if (reconciled.current || !transactions.length || !refunds.length) return
+    reconciled.current = true
+    refunds
+      .filter(r => r.status === 'Approved')
+      .forEach(r => syncRefundToTransaction(r))
+  }, [transactions, refunds])
+
   const handleLookup = () => {
     if (!searchId.trim()) return toast('Enter a transaction ID', 'error')
     const query = searchId.trim().replace('#', '')
     const txn = transactions.find(tx => String(tx.id).padStart(4, '0') === query.padStart(4, '0'))
     if (!txn) return toast(t('txn_not_found'), 'error')
     if (txn.status === 'Refunded') return toast('This transaction was already refunded', 'warning')
+    if (refunds.some(r => r.transactionId === txn.id && r.status === 'Pending')) return toast('This transaction already has a pending refund request', 'warning')
     setSelectedTxn(txn)
     const init = {}
     txn.items.forEach(item => { init[item.id] = { selected: false, qty: 1 } })
@@ -95,13 +127,13 @@ export default function Refunds() {
     }))
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (selectedCount === 0) return toast('Select at least one item', 'error')
     const selectedList = selectedTxn.items
       .filter(item => refundItems[item.id]?.selected)
       .map(item => ({ ...item, refundQty: refundItems[item.id].qty }))
 
-    addRefund({
+    const r = await addRefund({
       transactionId: selectedTxn.id,
       customerName:  selectedTxn.customerName || 'Walk-in',
       reason:        details.reason,
@@ -109,27 +141,31 @@ export default function Refunds() {
       notes:         details.notes,
       total:         total,
       status:        'Pending',
-      processedBy:   user?.name || role || 'Admin',
+      processedBy:   user?.user_metadata?.name || role || 'Admin',
       items:         selectedList,
     })
 
+    if (!r) return toast('Failed to submit refund — please try again', 'error')
     toast(t('refund_processed'), 'success')
     resetWizard()
   }
 
-  const handleApprove = (r) => {
-    updateRefund(r.id, { status: 'Approved' })
+  const handleApprove = async (r) => {
+    await updateRefund(r.id, { status: 'Approved' })
     if (r.items?.length) {
       r.items.forEach(item => {
         const prod = products.find(p => p.id === item.id)
         if (prod) restockProduct(prod.id, item.refundQty || item.qty || 1)
       })
     }
+    // items/status just changed locally via updateRefund, but r is the pre-update
+    // object — status doesn't matter for syncRefundToTransaction, only r.items/total do.
+    await syncRefundToTransaction(r)
     toast('Refund approved — items restocked ✓', 'success')
   }
 
-  const handleReject = (r) => {
-    updateRefund(r.id, { status: 'Rejected' })
+  const handleReject = async (r) => {
+    await updateRefund(r.id, { status: 'Rejected' })
     toast('Refund rejected', 'info')
   }
 
@@ -149,8 +185,8 @@ export default function Refunds() {
   ]
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>🔄 Refunds</div>
+    <div style={{ height: '100%', overflow: 'hidden', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>🔄 Refunds</div>
 
       {/* ══════════════════════════════════
         POLICY POPUP OVERLAY
@@ -252,9 +288,9 @@ export default function Refunds() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'minmax(0,300px) 1fr' : 'minmax(0,320px) 1fr', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Wizard UI */}
-        <div style={{ ...card, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ ...card, padding: 24, display: 'flex', flexDirection: 'column', gap: 20, minHeight: 0, overflowY: 'auto' }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {STEPS.map(s => (
               <div key={s.num} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -391,26 +427,43 @@ export default function Refunds() {
         </div>
 
         {/* History Table */}
-        <div style={{ ...card, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ fontWeight: 700 }}>📋 Refund History</div>
-            <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ ...card, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>📋 Refund History <span style={{ color: 'var(--text3)', fontWeight: 500 }}>({filteredRefunds.length})</span></div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {['All', 'Pending', 'Approved', 'Rejected'].map(s => (
                 <button key={s} onClick={() => setFilterStatus(s)} style={{
                   padding: '4px 12px', borderRadius: 99, border: '1px solid', fontSize: 11, cursor: 'pointer',
                   background: filterStatus === s ? 'var(--accent)' : 'transparent',
                   color: filterStatus === s ? '#0a0a0a' : 'var(--text2)',
                   borderColor: filterStatus === s ? 'var(--accent)' : 'var(--border)',
+                  fontWeight: filterStatus === s ? 700 : 500, transition: 'all .15s',
                 }}>{s}</button>
               ))}
+              <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 2px' }}/>
+              <button onClick={() => setDateSort(s => s === 'desc' ? 'asc' : 'desc')} style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: 118,
+                padding: '4px 12px', borderRadius: 99, cursor: 'pointer', fontWeight: 600, fontSize: 11, transition: 'all .15s',
+                border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text2)',
+              }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{dateSort === 'desc' ? '↓' : '↑'}</span>
+                {dateSort === 'desc' ? 'Newest first' : 'Oldest first'}
+              </button>
             </div>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--bg3)' }}>
+                <tr>
                   {['Refund #', 'TXN #', 'Date', 'Customer', 'Reason', 'Method', 'Total', 'Status', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: 12, textAlign: 'left', fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase' }}>{h}</th>
+                    <th key={h} onClick={h === 'Date' ? () => setDateSort(s => s === 'desc' ? 'asc' : 'desc') : undefined} style={{
+                      position: 'sticky', top: 0, zIndex: 1, background: 'var(--bg3)', padding: '10px 14px', textAlign: 'left',
+                      fontSize: 10, fontWeight: 700, letterSpacing: '.6px', color: 'var(--text3)', textTransform: 'uppercase',
+                      borderBottom: '1px solid var(--border)', cursor: h === 'Date' ? 'pointer' : 'default',
+                      userSelect: h === 'Date' ? 'none' : 'auto',
+                    }}>
+                      {h === 'Date' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>{h} <span style={{ fontSize: 9, opacity: .8 }}>{dateSort === 'desc' ? '↓' : '↑'}</span></span> : h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -418,27 +471,18 @@ export default function Refunds() {
                 {filteredRefunds.length === 0
                   ? <tr><td colSpan={9} style={{ textAlign: 'center', padding: 48, color: 'var(--text3)' }}>No refunds found</td></tr>
                   : filteredRefunds.map(r => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: 12, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: 'var(--accent)' }}>#{String(r.id).padStart(4, '0')}</td>
-                      <td style={{ padding: 12, fontSize: 11 }}>#{String(r.transactionId).padStart(4, '0')}</td>
-                      <td style={{ padding: 12, fontSize: 11, color: 'var(--text3)' }}>{fmtDate(r.createdAt)}</td>
-                      <td style={{ padding: 12, fontSize: 12 }}>{r.customerName}</td>
-                      <td style={{ padding: 12, fontSize: 11, color: 'var(--text2)' }}>{r.reason}</td>
-                      <td style={{ padding: 12, fontSize: 11 }}>{r.refundMethod}</td>
-                      <td style={{ padding: 12, fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>{peso(r.total)}</td>
-                      <td style={{ padding: 12 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <StatusBadge status={r.status} isLight={isLight} />
-                          {r.notes && (
-                            <div title={r.notes} style={{
-                              fontSize: 9, color: 'var(--text3)', maxWidth: 120,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              cursor: 'help',
-                            }}>📝 {r.notes}</div>
-                          )}
-                        </div>
+                    <tr key={r.id} className="refund-row" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 14px', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: 'var(--accent)' }}>#{String(r.id).padStart(4, '0')}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 11 }}>#{String(r.transactionId).padStart(4, '0')}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text3)' }}>{fmtDate(r.createdAt)}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 12 }}>{r.customerName}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text2)' }}>{r.reason}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 11 }}>{r.refundMethod}</td>
+                      <td style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>{peso(r.total)}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <StatusBadge status={r.status} isLight={isLight} />
                       </td>
-                      <td style={{ padding: 12 }}>
+                      <td style={{ padding: '10px 14px' }}>
                         {r.status === 'Pending' && isAdmin ? (
                           <div style={{ display: 'flex', gap: 5 }}>
                             <button onClick={() => handleApprove(r)} className="btn-success" style={{ fontSize: 10, padding: '4px 8px' }}>Approve</button>

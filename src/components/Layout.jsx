@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useAuthStore, useAppStore } from '../store'
+import { useAuthStore, useAppStore, useProductStore, useCustomerStore, useTransactionStore, useRefundStore, useHoldStore } from '../store'
 import { useT, useBreakpoint } from '../utils/helpers'
 
 const SidebarIcon = ({ children }) => (
@@ -26,8 +26,7 @@ const NAV = [
 
 export default function Layout() {
   const { user, role, logout }                          = useAuthStore()
-  const { theme, language, toggleTheme,
-          sidebarCollapsed, toggleSidebar }             = useAppStore()
+  const { theme, language, toggleTheme }                = useAppStore()
   const navigate  = useNavigate()
   const isLight   = theme === 'light'
   const location  = useLocation()
@@ -38,12 +37,18 @@ export default function Layout() {
 
   useEffect(()=>{ const i=setInterval(()=>setTime(new Date()),1000); return()=>clearInterval(i) },[])
   useEffect(()=>{ setMobileNavOpen(false) },[location.pathname])
+  useEffect(()=>{
+    useProductStore.getState().fetchProducts()
+    useCustomerStore.getState().fetchCustomers()
+    useTransactionStore.getState().fetchTransactions()
+    useRefundStore.getState().fetchRefunds()
+    useHoldStore.getState().fetchHolds()
+  },[])
 
   const handleLogout = async () => { await logout(); navigate('/login') }
   const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
   const initials = userName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-  const collapsed = !isMobile && sidebarCollapsed
-  const sW = isMobile ? '240px' : (sidebarCollapsed ? '64px' : '220px')
+  const sW = isMobile ? '240px' : '220px'
 
   const currentItem = NAV.flatMap(s=>s.items).find(i=>location.pathname.startsWith(i.to))
 
@@ -71,28 +76,29 @@ export default function Layout() {
         {/* Brand */}
         <div style={{
           display:'flex', alignItems:'center', gap:10,
+          justifyContent:'center',
           padding:'16px 14px', borderBottom:'1px solid var(--border)',
           minHeight:64, flexShrink:0,
         }}>
           <img src="/logo.png" alt="Logo" style={{ width:34, height:34, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}/>
-          {!collapsed && (
-            <div style={{ overflow:'hidden', flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'var(--accent)', letterSpacing:'-.2px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                GAPUZ POS
-              </div>
-              <div style={{ fontSize:10.5, color:'var(--text2)', marginTop:1 }}>Cagayan de Oro City</div>
+          <div style={{ overflow:'hidden', flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'var(--accent)', letterSpacing:'-.2px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              GAPUZ POS
             </div>
+            <div style={{ fontSize:10.5, color:'var(--text2)', marginTop:1 }}>Cagayan de Oro City</div>
+          </div>
+          {isMobile && (
+            <button onClick={()=>setMobileNavOpen(false)} aria-label="Close menu" style={{
+              marginLeft:'auto', width:22, height:22, borderRadius:6, flexShrink:0,
+              border:'1px solid var(--border2)', background:'var(--bg3)',
+              color:'var(--text)', cursor:'pointer', display:'flex',
+              alignItems:'center', justifyContent:'center', fontSize:11, transition:'all .15s',
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text)'}}>
+              ×
+            </button>
           )}
-          <button onClick={()=>isMobile?setMobileNavOpen(false):toggleSidebar()} style={{
-            marginLeft:'auto', width:22, height:22, borderRadius:6, flexShrink:0,
-            border:'1px solid var(--border2)', background:'var(--bg3)',
-            color:'var(--text)', cursor:'pointer', display:'flex',
-            alignItems:'center', justifyContent:'center', fontSize:11, transition:'all .15s',
-          }}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text)'}}>
-            {isMobile?'×':sidebarCollapsed?'›':'‹'}
-          </button>
         </div>
 
         {/* Nav */}
@@ -103,12 +109,11 @@ export default function Layout() {
             const sectionLabel = section.section[language]||section.section.en
             return (
               <div key={sectionLabel||section.items[0].to}>
-                {sectionLabel && !collapsed && (
+                {sectionLabel && (
                   <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.2px', textTransform:'uppercase', color:'var(--text2)', padding:'10px 8px 4px' }}>
                     {sectionLabel}
                   </div>
                 )}
-                {sectionLabel && collapsed && <div style={{ height:8 }}/>}
                 {items.map(item=>(
                   <NavLink key={item.to} to={item.to}
                     onClick={()=>{ if(isMobile) setMobileNavOpen(false) }}
@@ -129,7 +134,7 @@ export default function Layout() {
                         <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0, color: 'inherit', opacity: isActive ? 1 : 0.55, transition: 'all .2s' }}>
                           {item.icon}
                         </span>
-                        {!collapsed && <span>{t(item.key)}</span>}
+                        <span>{t(item.key)}</span>
                       </>
                     )}
                   </NavLink>
@@ -142,7 +147,7 @@ export default function Layout() {
         {/* Footer */}
         <div style={{ padding:'12px 8px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
           {/* Theme toggle */}
-          <div style={{ display:'flex', justifyContent:collapsed?'center':'flex-end', marginBottom:10 }}>
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
             <button onClick={toggleTheme} aria-label="Toggle theme" style={{
               width:30, height:30, borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg3)',
               color:'var(--text2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s',
@@ -162,24 +167,21 @@ export default function Layout() {
             <div style={{ width:34, height:34, borderRadius:9, background:'linear-gradient(140deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'var(--accent-dark)', flexShrink:0, boxShadow:'0 2px 6px rgba(52,211,153,0.3)' }}>
               {initials}
             </div>
-            {!collapsed && (
-              <div style={{ overflow:'hidden', flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{userName}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:10.5, fontWeight:600, color: role==='admin' ? 'var(--yellow)' : 'var(--text2)', marginTop:2 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                    {role==='admin'
-                      ? <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7Z"/>
-                      : <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>
-                    }
-                  </svg>
-                  {role==='admin' ? 'Admin' : 'Cashier'}
-                </div>
+            <div style={{ overflow:'hidden', flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{userName}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:10.5, fontWeight:600, color: role==='admin' ? 'var(--yellow)' : 'var(--text2)', marginTop:2 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                  {role==='admin'
+                    ? <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7Z"/>
+                    : <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>
+                  }
+                </svg>
+                {role==='admin' ? 'Admin' : 'Cashier'}
               </div>
-            )}
+            </div>
           </div>
 
-          {!collapsed && (
-            <button onClick={handleLogout} style={{
+          <button onClick={handleLogout} style={{
               width:'100%', marginTop:8, padding:'10px 14px', borderRadius:10, display:'flex', alignItems:'center',
               justifyContent:'center', gap:8, border:'1px solid var(--border2)', background:'var(--bg3)',
               color:'var(--text2)', cursor:'pointer', fontSize:12.5, fontWeight:700, transition:'all .15s',
@@ -190,8 +192,7 @@ export default function Layout() {
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
               {t('logout')}
-            </button>
-          )}
+          </button>
         </div>
       </aside>
 

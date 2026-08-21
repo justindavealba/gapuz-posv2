@@ -10,9 +10,9 @@ export const fmtTxnId = (id) => '#'+String(id).padStart(4,'0')
 export const genBarcode = () => 'BC-'+Date.now().toString(36).toUpperCase()
 
 export const stockStatus = (stock) => {
-  if(stock===0)  return {label:'Out of Stock',cls:'badge-red'}
-  if(stock<=5)   return {label:`Low: ${stock}`,cls:'badge-yellow'}
-  return               {label:`${stock} in stock`,cls:'badge-green'}
+  if(stock===0)  return {label:'Out of stock',cls:'badge-red',   color:'var(--red)',   bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.22)'}
+  if(stock<=5)   return {label:`${stock} left`,cls:'badge-yellow',color:'var(--yellow)',bg:'rgba(234,179,8,0.1)', border:'rgba(234,179,8,0.22)'}
+  return               {label:`${stock} in stock`,cls:'badge-green', color:'var(--green)', bg:'rgba(52,211,153,0.1)',border:'rgba(52,211,153,0.2)'}
 }
 
 export const getTier = (points) => {

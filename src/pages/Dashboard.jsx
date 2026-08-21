@@ -128,7 +128,7 @@ export default function Dashboard() {
 
       {/* HEADER */}
       <div>
-        <div style={{fontSize:20,fontWeight:700}}>{greeting}, <span style={{color:'var(--accent)'}}>{user?.name||'Admin'}</span> 👋</div>
+        <div style={{fontSize:20,fontWeight:700}}>{greeting}, <span style={{color:'var(--accent)'}}>{user?.user_metadata?.name||'Admin'}</span> 👋</div>
         <div style={{color:'var(--text2)',fontSize:13,marginTop:3}}>{now.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
       </div>
 

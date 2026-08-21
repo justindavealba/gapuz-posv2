@@ -10,12 +10,14 @@
     --text:#f5f5f5; --text2:#a1a1aa; --text3:#71717a;
     --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
     --yellow:#eab308; --purple:#8b5cf6; --orange:#f97316;
+    --skeleton-base:rgba(255,255,255,0.06); --skeleton-shine:rgba(255,255,255,0.16);
   }
   .light {
     --bg:#f8f8f8; --bg2:#ffffff; --bg3:#f2f2f2; --bg4:#e8e8e8; --bg5:#dedede;
     --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.15);
     --text:#0a0a0a; --text2:#52525b; --text3:#71717a;
     --accent:#059669; --accent2:#047857;
+    --skeleton-base:rgba(0,0,0,0.06); --skeleton-shine:rgba(0,0,0,0.13);
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   html,body,#root{height:100%;overflow:hidden;}
@@ -66,6 +68,8 @@
   .tbl-wrap tr:last-child td{border-bottom:none;}
   .tbl-wrap tbody tr{transition:background .1s;}
   .tbl-wrap tbody tr:hover td{background:var(--bg3);}
+  .refund-row{transition:background .1s;}
+  .refund-row:hover td{background:var(--bg3);}
   .page-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.3px;}
   .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text2);margin-bottom:12px;}
   .page-header{@apply flex items-center justify-between mb-5 flex-shrink-0;flex-wrap:wrap;gap:12px;}
@@ -75,12 +79,22 @@
 @keyframes slideIn{from{opacity:0}to{opacity:1}}
 @keyframes scaleIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-468px 0}100%{background-position:468px 0}}
 
 .animate-fade-up{animation:fadeUp .15s ease forwards;}
 .animate-slide-in{animation:slideIn .15s ease forwards;}
 .animate-scale-in{animation:scaleIn .15s ease forwards;}
 .animate-spin{animation:spin 1s linear infinite;}
 .font-mono{font-family:'JetBrains Mono',monospace!important;}
+
+.skeleton{
+  background-color:var(--skeleton-base);
+  background-image:linear-gradient(90deg, transparent, var(--skeleton-shine), transparent);
+  background-size:468px 100%;
+  background-repeat:no-repeat;
+  animation:shimmer 1.3s ease-in-out infinite;
+  border-radius:6px;
+}
 
 @media print{
   body *{visibility:hidden!important;}

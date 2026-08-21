@@ -6,8 +6,9 @@ import { useT, peso, fmtDate, getTier } from '../utils/helpers'
 const EMPTY = { name:'', email:'', phone:'', address:'' }
 
 export default function Customers() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore()
+  const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore()
   const transactions = useTransactionStore(s=>s.transactions)
+  const txnLoading = useTransactionStore(s=>s.loading)
   const [search,   setSearch]   = useState('')
   const [modal,    setModal]    = useState(null)
   const [form,     setForm]     = useState(EMPTY)
@@ -60,7 +61,15 @@ export default function Customers() {
           <table>
             <thead><tr>{['Customer','Contact','Tier','Points','Purchases','Total Spent','Joined','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
+              {loading?<tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M21 12a9 9 0 1 1-9-9"/>
+                  </svg>
+                  Loading customers…
+                </div>
+              </td></tr>
+              :filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
               :filtered.map(c=>{ const tier=getTier(c.points); return (
                 <tr key={c.id}>
                   <td><div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -137,18 +146,37 @@ export default function Customers() {
               <div style={{fontSize:10,color:'var(--text3)',marginTop:8,textAlign:'center'}}>Points earned: 10 pts per transaction + 1 pt per ₱100 spent</div>
             </div>
             <div style={{flex:1,overflowY:'auto'}}>
-              {custTxns.length===0?<div style={{textAlign:'center',padding:32,color:'var(--text3)'}}><div style={{fontSize:36,opacity:.2,marginBottom:8}}>🛒</div>{t('no_purchases')}</div>
-              :custTxns.map(tx=>(
-                <div key={tx.id} className="card-surface" style={{padding:12,marginBottom:8}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              {txnLoading?<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:32,color:'var(--text3)'}}>
+                <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M21 12a9 9 0 1 1-9-9"/>
+                </svg>
+                Loading history…
+              </div>
+              :custTxns.length===0?<div style={{textAlign:'center',padding:32,color:'var(--text3)'}}><div style={{fontSize:36,opacity:.2,marginBottom:8}}>🛒</div>{t('no_purchases')}</div>
+              :custTxns.map(tx=>{
+                const isRefunded  = tx.status==='Refunded'
+                const isVoided    = isRefunded||tx.status==='Partially Refunded'
+                return(
+                <div key={tx.id} className="card-surface" style={{padding:12,marginBottom:8,opacity:isRefunded?0.6:1}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,gap:8}}>
                     <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--accent)'}}>#{String(tx.id).padStart(4,'0')}</span>
-                    <span style={{fontSize:11,color:'var(--text3)'}}>{new Date(tx.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:'var(--green)'}}>{peso(tx.total)}</span>
+                    <span style={{fontSize:11,color:'var(--text3)',flex:1,textAlign:'center'}}>{new Date(tx.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:isRefunded?'var(--text3)':'var(--green)',textDecoration:isRefunded?'line-through':'none'}}>{peso(tx.total)}</span>
                   </div>
                   <div style={{fontSize:11,color:'var(--text2)'}}>{(tx.items||[]).map(i=>`${i.name} ×${i.qty}`).join(' · ')}</div>
-                  <div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>{tx.payment} · +{10 + Math.floor(tx.total/100)} pts earned (10 per txn + {Math.floor(tx.total/100)} pts from spending)</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:5,gap:8}}>
+                    <span style={{fontSize:10,color:'var(--text3)'}}>{tx.payment}{!isVoided&&` · +${10 + Math.floor(tx.total/100)} pts earned`}</span>
+                    {isVoided&&(
+                      <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:9,fontWeight:700,padding:'2px 8px',borderRadius:99,textTransform:'uppercase',letterSpacing:'.4px',
+                        background:isRefunded?'rgba(239,68,68,0.1)':'rgba(234,179,8,0.1)',
+                        color:isRefunded?'var(--red)':'var(--yellow)',
+                        border:`1px solid ${isRefunded?'rgba(239,68,68,0.25)':'rgba(234,179,8,0.25)'}`}}>
+                        ↩ {isRefunded?'Refunded':'Partially Refunded'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         </div>

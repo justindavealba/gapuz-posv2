@@ -22,6 +22,8 @@ export default function Cart({ products, customers, onHold }) {
   const [cashGiven,   setCashGiven]   = useState('')
   const [showReceipt, setShowReceipt] = useState(false)
   const [lastTxn,     setLastTxn]     = useState(null)
+  const [emailReceipt, setEmailReceipt] = useState(false)
+  const [customerEmail, setCustomerEmail] = useState('')
   const receiptRef = useRef()
   const handlePrint = useReactToPrint({content:()=>receiptRef.current})
 
@@ -30,20 +32,25 @@ export default function Cart({ products, customers, onHold }) {
   const totalItems = items.reduce((s,i)=>s+i.qty,0)
   const cust = customers.find(c=>c.id===customerId)
 
-  const checkout = () => {
-    if(!items.length) return
+  const [checkingOut, setCheckingOut] = useState(false)
+
+  const checkout = async () => {
+    if(!items.length || checkingOut) return
     if(!splitMode&&payMethod==='Cash'&&cashGiven&&parseFloat(cashGiven)<totalInt){toast('Cash given is less than total!','error');return}
+    setCheckingOut(true)
     const payDesc = splitMode?`${split1Pay}+${split2Pay}`:payMethod
-    const txn = addTransaction({
+    const txn = await addTransaction({
       customerName: cust?cust.name:'Walk-in',
       customerId:   customerId||null,
       payment:      payDesc,
       subtotal, discAmt, vat, total:totalInt,
       cashGiven:    payMethod==='Cash'?parseFloat(cashGiven)||totalInt:0,
       status:       'Completed',
-      cashierName:  user?.name||'Cashier',
+      cashierName:  user?.user_metadata?.name||'Cashier',
       items:        [...items],
     })
+    setCheckingOut(false)
+    if(!txn) { toast('Checkout failed — please try again','error'); return }
     deductStock(items)
     if(cust) addPoints(cust.id, totalInt)
     setLastTxn({...txn})
@@ -51,7 +58,12 @@ export default function Cart({ products, customers, onHold }) {
     toast(`${t('payment_success')} ${fmtTxnId(txn.id)} — ${peso(totalInt)}`,'success')
   }
 
-  const closeReceipt = () => { setShowReceipt(false); clearCart(); setCashGiven(''); setSplitMode(false); setSplit1Amt('') }
+  const closeReceipt = () => { setShowReceipt(false); clearCart(); setCashGiven(''); setSplitMode(false); setSplit1Amt(''); setEmailReceipt(false); setCustomerEmail('') }
+
+  const sendEmailReceipt = () => {
+    if(!customerEmail) return
+    toast(`Receipt will be sent to ${customerEmail} (email sending not wired up yet)`,'info')
+  }
   const border = '1px solid var(--border)'
 
   return (
@@ -169,18 +181,33 @@ export default function Cart({ products, customers, onHold }) {
         }
 
         {/* Checkout */}
-        <button onClick={checkout} disabled={items.length===0} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:items.length===0?'var(--bg4)':'var(--accent)',color:items.length===0?'var(--text3)':'#0a0a0a',fontWeight:800,fontSize:14,cursor:items.length===0?'not-allowed':'pointer',fontFamily:'inherit',transition:'all .18s'}}>
-          {t('checkout')} — {peso(totalInt)}
+        <button onClick={checkout} disabled={items.length===0||checkingOut} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:items.length===0?'var(--bg4)':'var(--accent)',color:items.length===0?'var(--text3)':'#0a0a0a',fontWeight:800,fontSize:14,cursor:items.length===0||checkingOut?'not-allowed':'pointer',fontFamily:'inherit',transition:'all .18s',opacity:checkingOut?0.6:1}}>
+          {checkingOut ? 'Processing…' : `${t('checkout')} — ${peso(totalInt)}`}
         </button>
       </div>
 
       {/* Receipt Modal */}
       {showReceipt&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}}>
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}}>
           <div className="card animate-scale-in" style={{padding:24,width:'min(360px,92vw)',maxHeight:'90vh',overflowY:'auto'}}>
             <div style={{textAlign:'center',fontWeight:700,fontSize:16,marginBottom:16,color:'var(--green)'}}>✅ {t('payment_success')}</div>
             <Receipt ref={receiptRef} txn={lastTxn} role={role}/>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:16}}>
+
+            {/* Email receipt option */}
+            <div style={{marginTop:16,padding:'10px 12px',borderRadius:10,border:'1px solid var(--border)',background:'var(--bg3)'}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12.5,fontWeight:600,color:'var(--text)'}}>
+                <input type="checkbox" checked={emailReceipt} onChange={e=>setEmailReceipt(e.target.checked)} style={{width:15,height:15,accentColor:'var(--accent)',cursor:'pointer'}}/>
+                📧 Email this receipt to the customer
+              </label>
+              {emailReceipt&&(
+                <div style={{display:'flex',gap:6,marginTop:10}}>
+                  <input type="email" className="input-field" style={{fontSize:12,padding:'8px 10px'}} placeholder="customer@gmail.com" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)}/>
+                  <button onClick={sendEmailReceipt} disabled={!customerEmail} className="btn-secondary" style={{padding:'8px 14px',fontSize:12,opacity:customerEmail?1:.5,cursor:customerEmail?'pointer':'not-allowed'}}>Send</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
               <button onClick={closeReceipt} className="btn-secondary" style={{padding:10}}>{t('close')}</button>
               <button onClick={handlePrint} className="btn-primary" style={{padding:10}}>🖨 {t('print')}</button>
             </div>

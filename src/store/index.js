@@ -41,13 +41,50 @@ export const useAuthStore = create((set, get) => ({
     await supabase.auth.signOut()
     set({ user: null, role: null })
   },
+
+  checkEmailExists: async (email) => {
+    const { data, error } = await supabase.functions.invoke('check-email', { body: { email: email.trim() } })
+    if (error) return { exists: null, error }
+    return { exists: !!data?.exists, error: null }
+  },
+
+  requestPasswordReset: async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { error }
+  },
+
+  updatePassword: async (password) => {
+    const { error } = await supabase.auth.updateUser({ password: password.trim() })
+    return { error }
+  },
+
+  updateProfile: async ({ name, currentPassword, password }) => {
+    const { user } = get()
+    if (name?.trim()) {
+      const { error } = await supabase.from('profiles').update({ name: name.trim() }).eq('id', user.id)
+      if (error) return { error }
+    }
+    if (password?.trim()) {
+      // Re-authenticate with the current password first — Supabase's updateUser() will
+      // happily change the password of whoever holds the active session, so this check
+      // is the only thing standing between "I forgot to lock my screen" and account takeover.
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+      if (verifyError) return { error: { message: 'Current password is incorrect' } }
+      const { error } = await supabase.auth.updateUser({ password: password.trim() })
+      if (error) return { error }
+    }
+    await get()._loadProfile(user)
+    return { error: null }
+  },
 }))
 
 // ── APP STORE (theme, language, sidebar — local UI prefs only) ────
 export const useAppStore = create(
   persist(
     (set, get) => ({
-      theme: 'dark',
+      theme: 'light',
       language: 'en',
       toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark'
@@ -108,10 +145,10 @@ export const useProductStore = create((set, get) => ({
         return ci ? { ...p, stock: Math.max(0, p.stock - ci.qty), sold: (p.sold || 0) + ci.qty } : p
       })
     }))
-    for (const ci of items) {
+    await Promise.all(items.map(ci => {
       const p = get().products.find(pp => pp.id === ci.id)
-      if (p) supabase.from('products').update({ stock: p.stock, sold: p.sold }).eq('product_id', ci.id)
-    }
+      return p ? supabase.from('products').update({ stock: p.stock, sold: p.sold }).eq('product_id', ci.id) : null
+    }))
   },
 
   restockProduct: async (id, qty) => {
@@ -119,6 +156,36 @@ export const useProductStore = create((set, get) => ({
     const newStock = (p?.stock || 0) + qty
     const { error } = await supabase.from('products').update({ stock: newStock }).eq('product_id', id)
     if (!error) set(s => ({ products: s.products.map(p => p.id === id ? { ...p, stock: newStock } : p) }))
+  },
+}))
+
+// ── CATEGORY STORE ───────────────────────────────────────────────
+const CATEGORY_SELECT = 'id:category_id, name, badgeColor:badge_color, sortOrder:sort_order'
+
+export const useCategoryStore = create((set, get) => ({
+  categories: [],
+  loading: false,
+
+  fetchCategories: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase.from('categories').select(CATEGORY_SELECT).order('sort_order')
+    if (!error) set({ categories: data, loading: false })
+    else set({ loading: false })
+  },
+
+  addCategory: async (name, badgeColor) => {
+    const sortOrder = get().categories.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1
+    const row = { name: name.trim(), badge_color: badgeColor, sort_order: sortOrder }
+    const { data: inserted, error } = await supabase.from('categories').insert(row).select(CATEGORY_SELECT).single()
+    if (error || !inserted) return null
+    set(s => ({ categories: [...s.categories, inserted] }))
+    return inserted
+  },
+
+  deleteCategory: async (id) => {
+    const { error } = await supabase.from('categories').delete().eq('category_id', id)
+    if (!error) set(s => ({ categories: s.categories.filter(c => c.id !== id) }))
+    return !error
   },
 }))
 

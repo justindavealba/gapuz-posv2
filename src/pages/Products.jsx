@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { useProductStore, useAppStore } from '../store'
+import { useState, useEffect } from 'react'
+import { Package, Camera, Plus, Pencil, AlertTriangle, TrendingUp, Tags, X, Check } from 'lucide-react'
+import { useProductStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, peso, stockStatus, genBarcode, CATEGORIES, CAT_COLORS } from '../utils/helpers'
+import { useT, peso, stockStatus, genBarcode, BADGE_SWATCHES } from '../utils/helpers'
 
-const EMPTY = { name:'', category:'Processors', price:'', costPrice:'', stock:'', barcode:'', image:'' }
+const EMPTY = { name:'', category:'', price:'', costPrice:'', stock:'', barcode:'', image:'' }
 
 export default function Products() {
   const { products, loading, addProduct, updateProduct, deleteProduct, restockProduct } = useProductStore()
+  const { categories, addCategory, deleteCategory } = useCategoryStore()
   const [search,    setSearch]    = useState('')
   const [catFilter, setCatFilter] = useState('All')
   const [sortBy,    setSortBy]    = useState('name')
@@ -14,6 +16,13 @@ export default function Products() {
   const [form,      setForm]      = useState(EMPTY)
   const [selected,  setSelected]  = useState(null)
   const [restockQty,setRestockQty]= useState('')
+  const [lossConfirm,setLossConfirm]= useState(null)
+  const [page,      setPage]      = useState(1)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatColor,setNewCatColor]= useState(BADGE_SWATCHES[0].cls)
+  const [catPage,    setCatPage]    = useState(1)
+  const PAGE_SIZE = 6
+  const CAT_PAGE_SIZE = 5
   const { theme } = useAppStore()
   const toast = useToast()
   const t     = useT()
@@ -22,7 +31,10 @@ export default function Products() {
   const mutedText = isLight ? '#4b5563' : '#d1d5db'
   const bodyText = isLight ? '#374151' : '#ffffff'
 
-  const openAdd   = () => { setForm({...EMPTY,barcode:genBarcode()}); setModal('add') }
+  const CATEGORIES = ['All', ...categories.map(c=>c.name)]
+  const catBadge = (name) => categories.find(c=>c.name===name)?.badgeColor || 'badge-accent'
+
+  const openAdd   = () => { setForm({...EMPTY,category:categories[0]?.name||'',barcode:genBarcode()}); setModal('add') }
   const openEdit  = p  => { setForm({name:p.name,category:p.category,price:p.price,costPrice:p.costPrice||'',stock:p.stock,barcode:p.barcode||'',image:p.image||''}); setSelected(p); setModal('edit') }
   const openRestock = p => { setSelected(p); setRestockQty(''); setModal('restock') }
 
@@ -38,11 +50,25 @@ export default function Products() {
   }
 
   const handleSave = () => {
-    if(!form.name||!form.price) return toast('Name and price are required','error')
-    const data = { name:form.name.trim(), category:form.category, price:parseFloat(form.price), costPrice:parseFloat(form.costPrice)||0, stock:parseInt(form.stock)||0, barcode:form.barcode||genBarcode(), image:form.image }
+    if(!form.name.trim()) return toast('Product name is required','error')
+    if(!form.price) return toast('Price is required','error')
+    if(!form.costPrice) return toast('Cost price is required','error')
+    if(!form.stock||parseInt(form.stock)<=0) return toast('Stock must be greater than 0','error')
+    const priceNum = parseFloat(form.price), costNum = parseFloat(form.costPrice)
+    const data = { name:form.name.trim(), category:form.category, price:priceNum, costPrice:costNum||0, stock:parseInt(form.stock)||0, barcode:form.barcode||genBarcode(), image:form.image }
+    if(costNum>priceNum){
+      const lossPct = (((costNum-priceNum)/priceNum)*100).toFixed(1)
+      setLossConfirm({ data, lossPct })
+      return
+    }
+    saveProduct(data)
+  }
+
+  const saveProduct = (data) => {
     if(modal==='add') { addProduct(data); toast(t('product_added'),'success') }
     else { updateProduct(selected.id,data); toast(t('product_updated'),'success') }
     setModal(null)
+    setLossConfirm(null)
   }
 
   const handleRestock = () => {
@@ -58,9 +84,37 @@ export default function Products() {
     toast(t('product_deleted'),'info')
   }
 
+  const handleAddCategory = async () => {
+    const name = newCatName.trim()
+    if(!name) return toast('Category name is required','error')
+    if(categories.some(c=>c.name.toLowerCase()===name.toLowerCase())) return toast('That category already exists','error')
+    const added = await addCategory(name, newCatColor)
+    if(!added) return toast('Failed to add category','error')
+    toast('Category added','success')
+    setNewCatName('')
+    setCatPage(Math.max(1, Math.ceil((categories.length+1)/CAT_PAGE_SIZE)))
+  }
+
+  const handleDeleteCategory = async (cat) => {
+    const inUse = products.filter(p=>p.category===cat.name).length
+    if(inUse>0) return toast(`${inUse} product(s) still use "${cat.name}" — reassign them first`,'error')
+    if(!window.confirm(`Delete category "${cat.name}"?`)) return
+    const ok = await deleteCategory(cat.id)
+    if(ok) toast('Category deleted','info')
+  }
+
   const filtered = products
     .filter(p=>(catFilter==='All'||p.category===catFilter)&&(!search||p.name.toLowerCase().includes(search.toLowerCase())||(p.barcode||'').toLowerCase().includes(search.toLowerCase())))
     .sort((a,b)=>{ if(sortBy==='name') return a.name.localeCompare(b.name); if(sortBy==='price-asc') return a.price-b.price; if(sortBy==='price-desc') return b.price-a.price; if(sortBy==='stock') return b.stock-a.stock; if(sortBy==='sold') return (b.sold||0)-(a.sold||0); return 0 })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE))
+  useEffect(()=>{ setPage(1) }, [search, catFilter, sortBy])
+  useEffect(()=>{ if(page>totalPages) setPage(totalPages) }, [totalPages])
+  const pageItems = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
+
+  const catTotalPages = Math.max(1, Math.ceil(categories.length/CAT_PAGE_SIZE))
+  useEffect(()=>{ if(catPage>catTotalPages) setCatPage(catTotalPages) }, [catTotalPages])
+  const catPageItems = categories.slice((catPage-1)*CAT_PAGE_SIZE, catPage*CAT_PAGE_SIZE)
 
   const totalValue = products.reduce((s,p)=>s+p.price*p.stock,0)
   const outCount   = products.filter(p=>p.stock===0).length
@@ -97,6 +151,7 @@ export default function Products() {
         <select className="select-field" value={sortBy} onChange={e=>setSortBy(e.target.value)}>
           <option value="name">Name A–Z</option><option value="price-asc">Price ↑</option><option value="price-desc">Price ↓</option><option value="stock">Stock</option><option value="sold">Best Selling</option>
         </select>
+        <button onClick={()=>{setCatPage(1);setModal('categories')}} className="btn-secondary" style={{fontSize:12,display:'flex',alignItems:'center',gap:6}}><Tags size={14}/>Categories</button>
       </div>
       <div style={{flex:1,overflowY:'auto'}}>
         <div className="tbl-wrap">
@@ -112,19 +167,19 @@ export default function Products() {
                 </div>
               </td></tr>
               :filtered.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:40,color:mutedText}}>{t('no_data')}</td></tr>
-              :filtered.map(p=>{
+              :pageItems.map(p=>{
                 const profit=p.costPrice?((p.price-p.costPrice)/p.price*100).toFixed(1):'—'
                 const ss=stockStatus(p.stock)
                 return(<tr key={p.id}>
-                  <td style={{width:40}}>
+                  <td style={{width:56}}>
                     {p.image && (p.image.startsWith('data:') || p.image.startsWith('http')) ? (
-                      <img src={p.image} style={{width:28,height:28,borderRadius:6,objectFit:'cover'}} alt=""/>
+                      <img src={p.image} style={{width:44,height:44,borderRadius:8,objectFit:'cover',border:'1px solid var(--border2)'}} alt=""/>
                     ) : (
-                      <div style={{width:28,height:28,borderRadius:6,background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:mutedText}}>{p.image || p.icon || '📦'}</div>
+                      <div style={{width:44,height:44,borderRadius:8,background:'var(--bg3)',border:'1px solid var(--border2)',display:'flex',alignItems:'center',justifyContent:'center',color:mutedText}}>{p.image || p.icon || <Package size={18}/>}</div>
                     )}
                   </td>
                   <td><div style={{fontWeight:600,fontSize:13,color:'var(--text)'}}>{p.name}</div><div style={{fontSize:11.5,color:'var(--text2)',fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{p.barcode}</div></td>
-                  <td><span className={`badge ${CAT_COLORS[p.category]||'badge-accent'}`} style={{fontSize:10}}>{p.category}</span></td>
+                  <td><span className={`badge ${catBadge(p.category)}`} style={{fontSize:10}}>{p.category}</span></td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:bodyText,fontWeight:600}}>{peso(p.price)}</td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:bodyText}}>{p.costPrice?peso(p.costPrice):'—'}</td>
                   <td style={{fontSize:11,color:p.costPrice?'var(--green)':mutedText}}>{profit}{p.costPrice?'%':''}</td>
@@ -158,13 +213,24 @@ export default function Products() {
           </table>
         </div>
       </div>
+      {totalPages>1&&(
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,flexShrink:0,paddingTop:4}}>
+          <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:page===1?0.5:1,cursor:page===1?'not-allowed':'pointer'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div style={{fontSize:11.5,color:mutedText,fontWeight:600}}>{page} of {totalPages}</div>
+          <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:page===totalPages?0.5:1,cursor:page===totalPages?'not-allowed':'pointer'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      )}
       {(modal==='add'||modal==='edit')&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'#000'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
           <div className="card animate-scale-in" style={{width:'min(480px,92vw)',padding:28,maxHeight:'90vh',overflowY:'auto'}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>{modal==='add'?`➕ ${t('add_product')}`:`✏️ ${t('edit_product')}`}</div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:20,display:'flex',alignItems:'center',gap:6}}>{modal==='add'?<><Plus size={14} style={{color:'var(--green)'}}/>{t('add_product')}</>:<><Pencil size={14} style={{color:'var(--blue)'}}/>{t('edit_product')}</>}</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:14}}>
               <div style={{gridColumn:'span 2'}}><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('product_name')} *</label><input className="input-field" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. AMD Ryzen 5 5600X"/></div>
-              <div><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('category')}</label><select className="select-field" style={{width:'100%'}} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{CATEGORIES.filter(c=>c!=='All').map(c=><option key={c}>{c}</option>)}</select></div>
+              <div><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('category')}</label><select className="select-field" style={{width:'100%'}} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{categories.map(c=><option key={c.id}>{c.name}</option>)}</select></div>
               <div>
                 <label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('product_image')}</label>
                 <label style={{
@@ -175,7 +241,7 @@ export default function Products() {
                     {form.image && (form.image.startsWith('data:') || form.image.startsWith('http')) ? (
                       <img src={form.image} style={{width:'100%', height:'100%', objectFit:'cover'}} alt=""/>
                     ) : (
-                      <span style={{fontSize:12}}>{form.image || '📷'}</span>
+                      <span style={{fontSize:12}}>{form.image || <Camera size={13}/>}</span>
                     )}
                   </div>
                   <div style={{flex:1, fontSize:11, fontWeight:700, color:form.image?'var(--text)':'var(--text3)'}}>
@@ -188,24 +254,97 @@ export default function Products() {
                 </label>
               </div>
               {[['price',t('price'),'0.00'],['costPrice',t('cost_price'),'0.00'],['stock',t('stock'),'0']].map(([key,label,ph])=>(
-                <div key={key}><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{label}</label><input className="input-field" type="number" min="0" value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}/></div>
+                <div key={key}><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{label} *</label><input className="input-field" type="number" min="0" value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}/></div>
               ))}
               <div><label style={{fontSize:10,color:mutedText,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('barcode')}</label><div style={{display:'flex',gap:6}}><input className="input-field" value={form.barcode} onChange={e=>setForm(f=>({...f,barcode:e.target.value}))} placeholder="BC-..."/><button onClick={()=>setForm(f=>({...f,barcode:genBarcode()}))} style={{padding:'9px 10px',borderRadius:8,border:'1px solid var(--border2)',background:'var(--bg3)',color:bodyText,cursor:'pointer',fontSize:11}}>Gen</button></div></div>
             </div>
-            {form.price&&form.costPrice&&<div style={{marginTop:12,padding:10,background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8,fontSize:12,color:'var(--green)'}}>💰 Profit: {(((parseFloat(form.price)-parseFloat(form.costPrice))/parseFloat(form.price))*100).toFixed(1)}%</div>}
+            {form.price&&form.costPrice&&(() => {
+              const marginPct = ((parseFloat(form.price)-parseFloat(form.costPrice))/parseFloat(form.price))*100
+              const isLoss = marginPct < 0
+              const color = isLoss ? 'var(--red)' : 'var(--green)'
+              const rgb = isLoss ? '239,68,68' : '34,197,94'
+              return (
+                <div style={{marginTop:12,padding:10,background:`rgba(${rgb},0.08)`,border:`1px solid rgba(${rgb},0.3)`,borderRadius:8,fontSize:12,fontWeight:700,color,display:'flex',alignItems:'center',gap:6}}>
+                  {isLoss ? <AlertTriangle size={14}/> : <TrendingUp size={14}/>} {isLoss ? 'Loss' : 'Profit'}: {marginPct.toFixed(1)}%
+                </div>
+              )
+            })()}
             <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}><button onClick={()=>setModal(null)} className="btn-secondary">{t('cancel')}</button><button onClick={handleSave} className="btn-primary">{t('save')}</button></div>
           </div>
         </div>
       )}
       {modal==='restock'&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
           <div className="card animate-scale-in" style={{width:'min(340px,92vw)',padding:28}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>📦 {t('add_stock')}</div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:8,display:'flex',alignItems:'center',gap:6}}><Package size={14} style={{color:'var(--blue)'}}/>{t('add_stock')}</div>
             <div style={{fontSize:13,color:bodyText,marginBottom:16}}>{selected?.name}</div>
             <div style={{fontSize:11,color:mutedText,marginBottom:6}}>Current stock: <strong style={{color:'var(--text)'}}>{selected?.stock}</strong></div>
             <input className="input-field" type="number" min="1" value={restockQty} onChange={e=>setRestockQty(e.target.value)} placeholder={t('qty_to_add')} onKeyDown={e=>e.key==='Enter'&&handleRestock()}/>
             {restockQty&&parseInt(restockQty)>0&&<div style={{marginTop:8,fontSize:12,color:'var(--green)'}}>New stock: {selected.stock+parseInt(restockQty)}</div>}
             <div style={{display:'flex',gap:10,marginTop:20}}><button onClick={()=>setModal(null)} className="btn-secondary" style={{flex:1}}>{t('cancel')}</button><button onClick={handleRestock} className="btn-primary" style={{flex:1}}>{t('restock')}</button></div>
+          </div>
+        </div>
+      )}
+      {modal==='categories'&&(
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:28,maxHeight:'85vh',display:'flex',flexDirection:'column'}}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:16,display:'flex',alignItems:'center',gap:6}}><Tags size={14} style={{color:'var(--accent)'}}/>Manage Categories</div>
+
+            <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:6,marginBottom:8,minHeight:CAT_PAGE_SIZE*38}}>
+              {categories.length===0?<div style={{color:mutedText,fontSize:12,textAlign:'center',padding:20}}>No categories yet.</div>
+              :catPageItems.map(c=>{
+                const count = products.filter(p=>p.category===c.name).length
+                const hex = BADGE_SWATCHES.find(s=>s.cls===c.badgeColor)?.hex || '#34d399'
+                return (
+                  <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,background:'var(--bg3)'}}>
+                    <span style={{width:12,height:12,borderRadius:'50%',background:hex,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0,fontSize:12,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+                    <div style={{fontSize:10,color:mutedText,flexShrink:0}}>{count} product{count===1?'':'s'}</div>
+                    <button onClick={()=>handleDeleteCategory(c)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',padding:2,display:'flex',flexShrink:0}}><X size={14}/></button>
+                  </div>
+                )
+              })}
+            </div>
+            {catTotalPages>1&&(
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:16}}>
+                <button onClick={()=>setCatPage(p=>Math.max(1,p-1))} disabled={catPage===1} className="btn-secondary" style={{padding:'5px 9px',display:'flex',alignItems:'center',opacity:catPage===1?0.5:1,cursor:catPage===1?'not-allowed':'pointer'}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div style={{fontSize:11,color:mutedText,fontWeight:600}}>{catPage} of {catTotalPages}</div>
+                <button onClick={()=>setCatPage(p=>Math.min(catTotalPages,p+1))} disabled={catPage===catTotalPages} className="btn-secondary" style={{padding:'5px 9px',display:'flex',alignItems:'center',opacity:catPage===catTotalPages?0.5:1,cursor:catPage===catTotalPages?'not-allowed':'pointer'}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            )}
+
+            <div style={{borderTop:'1px solid var(--border)',paddingTop:16}}>
+              <label style={{fontSize:10,color:mutedText,display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'.5px'}}>New Category</label>
+              <input className="input-field" value={newCatName} onChange={e=>setNewCatName(e.target.value)} placeholder="e.g. Monitors" onKeyDown={e=>e.key==='Enter'&&handleAddCategory()}/>
+              <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                {BADGE_SWATCHES.map(s=>(
+                  <button key={s.cls} onClick={()=>setNewCatColor(s.cls)} style={{width:22,height:22,borderRadius:'50%',background:s.hex,border:newCatColor===s.cls?'2px solid var(--text)':'2px solid transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+                    {newCatColor===s.cls&&<Check size={12} color="#fff"/>}
+                  </button>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:10,marginTop:16,justifyContent:'flex-end'}}>
+                <button onClick={()=>setModal(null)} className="btn-secondary">{t('close')||'Close'}</button>
+                <button onClick={handleAddCategory} className="btn-primary">Add Category</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {lossConfirm&&(
+        <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)'}} onClick={e=>e.target===e.currentTarget&&setLossConfirm(null)}>
+          <div className="card animate-scale-in" style={{width:'min(360px,92vw)',padding:28,textAlign:'center'}}>
+            <div style={{width:44,height:44,borderRadius:'50%',background:'rgba(239,68,68,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',color:'var(--red)'}}><AlertTriangle size={22}/></div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>This product will sell at a loss</div>
+            <div style={{fontSize:12.5,color:bodyText,lineHeight:1.5}}>The cost price is higher than the selling price — you'll lose <strong style={{color:'var(--red)'}}>{lossConfirm.lossPct}%</strong> per unit sold. Save it anyway?</div>
+            <div style={{display:'flex',gap:10,marginTop:20}}>
+              <button onClick={()=>setLossConfirm(null)} className="btn-secondary" style={{flex:1}}>{t('cancel')}</button>
+              <button onClick={()=>saveProduct(lossConfirm.data)} className="btn-primary" style={{flex:1,background:'var(--red)',borderColor:'var(--red)'}}>Save Anyway</button>
+            </div>
           </div>
         </div>
       )}

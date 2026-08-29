@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useAuthStore, useAppStore } from './store'
 import { ToastProvider } from './utils/toast'
 import Login     from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Layout    from './components/Layout'
 import AppSkeleton from './components/AppSkeleton'
 import LoginSkeleton from './components/LoginSkeleton'
@@ -37,10 +38,11 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login/>}/>
+          <Route path="/reset-password" element={<ResetPassword/>}/>
           <Route path="/" element={<Guard><Layout/></Guard>}>
             <Route index element={<Navigate to="/pos" replace/>}/>
             <Route path="pos"       element={<POS/>}/>
-            <Route path="dashboard" element={<Guard adminOnly><Dashboard/></Guard>}/>
+            <Route path="dashboard" element={<Dashboard/>}/>
             <Route path="products"  element={<Guard adminOnly><Products/></Guard>}/>
             <Route path="reports"   element={<Guard adminOnly><Reports/></Guard>}/>
             <Route path="customers" element={<Customers/>}/>

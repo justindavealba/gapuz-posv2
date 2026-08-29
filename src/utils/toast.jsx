@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react'
+import { CheckCircle2, XCircle, Info, AlertTriangle } from 'lucide-react'
 const ToastCtx = createContext(null)
 let _id = 0
 export function ToastProvider({ children }) {
@@ -8,27 +9,30 @@ export function ToastProvider({ children }) {
     setToasts(t=>[...t,{id,message,type}])
     setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),duration)
   },[])
-  const icons = {success:'✅',error:'❌',info:'ℹ️',warning:'⚠️'}
+  const icons = {success:CheckCircle2,error:XCircle,info:Info,warning:AlertTriangle}
   const colors = {
     success:{border:'rgba(34,197,94,0.3)', color:'var(--green)'},
     error:  {border:'rgba(239,68,68,0.3)',color:'var(--red)'},
     info:   {border:'rgba(52,211,153,0.3)', color:'var(--accent)'},
-    warning:{border:'rgba(234,179,8,0.3)', color:'var(--yellow)'},
+    warning:{border:'rgba(245,158,11,0.3)', color:'var(--yellow)'},
   }
   return (
     <ToastCtx.Provider value={addToast}>
       {children}
       <div style={{position:'fixed',bottom:20,right:20,display:'flex',flexDirection:'column',gap:8,zIndex:9999}}>
-        {toasts.map(t=>(
-          <div key={t.id} className="animate-slide-in" style={{
-            display:'flex',alignItems:'center',gap:10,padding:'11px 16px',
-            borderRadius:6,fontSize:13,boxShadow:'0 2px 8px rgba(0,0,0,0.25)',maxWidth:320,
-            background:'var(--bg2)',border:`1px solid ${colors[t.type]?.border}`,
-          }}>
-            <span>{icons[t.type]}</span>
-            <span style={{color:'var(--text)',fontWeight:400}}>{t.message}</span>
-          </div>
-        ))}
+        {toasts.map(t=>{
+          const Icon = icons[t.type]
+          return (
+            <div key={t.id} className="animate-slide-in" style={{
+              display:'flex',alignItems:'center',gap:10,padding:'11px 16px',
+              borderRadius:6,fontSize:13,boxShadow:'0 2px 8px rgba(0,0,0,0.25)',maxWidth:320,
+              background:'var(--bg2)',border:`1px solid ${colors[t.type]?.border}`,
+            }}>
+              <Icon size={16} style={{color:colors[t.type]?.color,flexShrink:0}}/>
+              <span style={{color:'var(--text)',fontWeight:400}}>{t.message}</span>
+            </div>
+          )
+        })}
       </div>
     </ToastCtx.Provider>
   )

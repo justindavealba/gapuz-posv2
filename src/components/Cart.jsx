@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useReactToPrint } from 'react-to-print'
+import { Banknote, Smartphone, CreditCard, Zap, ShoppingCart, Package, AlertTriangle, Mail, Printer, Check, PauseCircle } from 'lucide-react'
 import { useCartStore, useAuthStore, useTransactionStore, useProductStore, useCustomerStore } from '../store'
 import { peso, fmtTxnId, useT, useBreakpoint } from '../utils/helpers'
 import { useToast } from '../utils/toast'
 import Receipt from './Receipt'
 
-const PAY = [{id:'Cash',label:'💵 Cash'},{id:'GCash',label:'📱 GCash'},{id:'Card',label:'💳 Card'}]
+const PAY = [{id:'Cash',label:'Cash',icon:Banknote},{id:'GCash',label:'GCash',icon:Smartphone},{id:'Card',label:'Card',icon:CreditCard}]
 
 export default function Cart({ products, customers, onHold }) {
   const { items, discount, payMethod, customerId, splitMode, split1Pay, split2Pay, split1Amt,
@@ -20,7 +21,10 @@ export default function Cart({ products, customers, onHold }) {
   const { isMobile } = useBreakpoint()
 
   const [cashGiven,   setCashGiven]   = useState('')
-  const [showReceipt, setShowReceipt] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [step,        setStep]        = useState('method') // 'method' | 'processing' | 'success'
+  const [changeDue,   setChangeDue]   = useState(0)
+  const [changeAcked, setChangeAcked] = useState(false)
   const [lastTxn,     setLastTxn]     = useState(null)
   const [emailReceipt, setEmailReceipt] = useState(false)
   const [customerEmail, setCustomerEmail] = useState('')
@@ -34,35 +38,63 @@ export default function Cart({ products, customers, onHold }) {
 
   const [checkingOut, setCheckingOut] = useState(false)
 
-  const checkout = async () => {
-    if(!items.length || checkingOut) return
-    if(!splitMode&&payMethod==='Cash'&&cashGiven&&parseFloat(cashGiven)<totalInt){toast('Cash given is less than total!','error');return}
+  const openCheckout = () => { if(!items.length) return; setStep('method'); setCheckoutOpen(true) }
+  const cancelCheckout = () => setCheckoutOpen(false)
+
+  const handleCompletePayment = async () => {
+    if(checkingOut) return
+    if(!splitMode&&payMethod==='Cash'){
+      if(!cashGiven.trim()){toast('Please enter the cash given','error');return}
+      if(parseFloat(cashGiven)<totalInt){toast('Cash given is less than total!','error');return}
+    }
     setCheckingOut(true)
+    setStep('processing')
     const payDesc = splitMode?`${split1Pay}+${split2Pay}`:payMethod
-    const txn = await addTransaction({
-      customerName: cust?cust.name:'Walk-in',
-      customerId:   customerId||null,
-      payment:      payDesc,
-      subtotal, discAmt, vat, total:totalInt,
-      cashGiven:    payMethod==='Cash'?parseFloat(cashGiven)||totalInt:0,
-      status:       'Completed',
-      cashierName:  user?.user_metadata?.name||'Cashier',
-      items:        [...items],
-    })
+    const [txn] = await Promise.all([
+      addTransaction({
+        customerName: cust?cust.name:'Walk-in',
+        customerId:   customerId||null,
+        payment:      payDesc,
+        subtotal, discAmt, vat, total:totalInt,
+        cashGiven:    payMethod==='Cash'?parseFloat(cashGiven):0,
+        status:       'Completed',
+        cashierName:  user?.user_metadata?.name||'Cashier',
+        items:        [...items],
+      }),
+      new Promise(r=>setTimeout(r,650)),
+    ])
     setCheckingOut(false)
-    if(!txn) { toast('Checkout failed — please try again','error'); return }
+    if(!txn) { toast('Checkout failed — please try again','error'); setStep('method'); return }
     deductStock(items)
     if(cust) addPoints(cust.id, totalInt)
     setLastTxn({...txn})
-    setShowReceipt(true)
     toast(`${t('payment_success')} ${fmtTxnId(txn.id)} — ${peso(totalInt)}`,'success')
+    if(!splitMode&&payMethod==='Cash'&&change>0){ setChangeDue(change); setChangeAcked(false) }
+    else { setReceiptPrinted(false); setChangeAcked(true) }
+    setStep('success')
   }
 
-  const closeReceipt = () => { setShowReceipt(false); clearCart(); setCashGiven(''); setSplitMode(false); setSplit1Amt(''); setEmailReceipt(false); setCustomerEmail('') }
+  const [receiptPrinted, setReceiptPrinted] = useState(false)
+  const [actionsVisible, setActionsVisible] = useState(false)
+  const confirmChangeGiven = () => { setReceiptPrinted(false); setChangeAcked(true) }
+
+  useEffect(() => {
+    if(step==='success' && changeAcked){
+      setActionsVisible(true)
+      setReceiptPrinted(true)
+    }
+  }, [step, changeAcked])
+
+  const finishTransaction = () => {
+    setCheckoutOpen(false)
+    setStep('method')
+    clearCart(); setCashGiven(''); setSplitMode(false); setSplit1Amt(''); setEmailReceipt(false); setCustomerEmail('')
+    setChangeAcked(false); setLastTxn(null)
+  }
 
   const sendEmailReceipt = () => {
     if(!customerEmail) return
-    toast(`Receipt will be sent to ${customerEmail} (email sending not wired up yet)`,'info')
+    toast('Email receipts coming soon!','info')
   }
   const border = '1px solid var(--border)'
 
@@ -75,7 +107,7 @@ export default function Cart({ products, customers, onHold }) {
           {totalItems>0&&<span style={{background:'var(--accent)',color:'#0a0a0a',fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:99,fontFamily:"'JetBrains Mono',monospace"}}>{totalItems}</span>}
         </div>
         <div style={{display:'flex',gap:6}}>
-          {onHold&&items.length>0&&<button onClick={onHold} style={{padding:'4px 10px',borderRadius:7,border:'1px solid var(--border2)',background:'var(--bg3)',color:'var(--text2)',cursor:'pointer',fontSize:11,fontWeight:600}}>⏸ Hold</button>}
+          {onHold&&items.length>0&&<button onClick={onHold} style={{padding:'4px 10px',borderRadius:7,border:'1px solid var(--border2)',background:'var(--bg3)',color:'var(--text2)',cursor:'pointer',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><PauseCircle size={12}/>Hold</button>}
           {items.length>0&&<button onClick={clearCart} style={{padding:'4px 10px',borderRadius:7,border:'1px solid rgba(239,68,68,0.25)',background:'rgba(239,68,68,0.08)',color:'var(--red)',cursor:'pointer',fontSize:11,fontWeight:600}}>{t('clear')}</button>}
         </div>
       </div>
@@ -83,7 +115,7 @@ export default function Cart({ products, customers, onHold }) {
       {/* Items */}
       <div style={{flex:1,overflowY:'auto',padding:10}}>
         {items.length===0
-          ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text3)',gap:8}}><span style={{fontSize:40,opacity:.2}}>🛒</span><span>{t('empty_cart')}</span><span style={{fontSize:11}}>{t('click_to_add')}</span></div>
+          ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text3)',gap:8}}><ShoppingCart size={36} style={{opacity:.2}}/><span>{t('empty_cart')}</span><span style={{fontSize:11}}>{t('click_to_add')}</span></div>
           : items.map(item=>{
             const prod = products.find(p=>p.id===item.id)
             return (
@@ -95,7 +127,7 @@ export default function Cart({ products, customers, onHold }) {
                         {item.image && (item.image.startsWith('data:') || item.image.startsWith('http')) ? (
                           <img src={item.image} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
                         ) : (
-                          <span style={{fontSize:12}}>{item.image || '📦'}</span>
+                          <span style={{fontSize:12}}>{item.image || <Package size={13}/>}</span>
                         )}
                       </div>
                       <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{item.name}</span>
@@ -122,7 +154,7 @@ export default function Cart({ products, customers, onHold }) {
       <div style={{padding:'8px 12px',borderTop:border,flexShrink:0}}>
         <select className="select-field" style={{fontSize:12}} value={customerId||''} onChange={e=>setCustomer(e.target.value?parseInt(e.target.value):null)}>
           <option value="">{t('walk_in')}</option>
-          {customers.map(c=><option key={c.id} value={c.id}>{c.name} (⭐ {c.points} pts)</option>)}
+          {customers.map(c=><option key={c.id} value={c.id}>{c.name} ({c.points} pts)</option>)}
         </select>
       </div>
 
@@ -148,70 +180,204 @@ export default function Cart({ products, customers, onHold }) {
           </div>
         </div>
 
-        {/* Split toggle */}
-        <button onClick={()=>setSplitMode(!splitMode)} style={{padding:6,borderRadius:8,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',...(splitMode?{borderColor:'var(--accent)',background:'rgba(52,211,153,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text3)'})}}>
-          ⚡ {t('split_payment')} {splitMode?'(ON)':''}
-        </button>
-
-        {/* Payment methods */}
-        {splitMode
-          ? <div style={{display:'flex',flexDirection:'column',gap:5}}>
-              <div style={{display:'flex',gap:5}}>
-                <select className="select-field" style={{width:90,fontSize:11,padding:'6px 8px'}} value={split1Pay} onChange={e=>setSplit1Pay(e.target.value)}>{['Cash','GCash','Card'].map(m=><option key={m}>{m}</option>)}</select>
-                <input type="number" className="input-field" style={{fontSize:12,padding:'6px 10px',fontFamily:"'JetBrains Mono',monospace"}} placeholder="Amount (₱)" value={split1Amt} onChange={e=>setSplit1Amt(e.target.value)}/>
-              </div>
-              <div style={{display:'flex',gap:5}}>
-                <select className="select-field" style={{width:90,fontSize:11,padding:'6px 8px'}} value={split2Pay} onChange={e=>setSplit2Pay(e.target.value)}>{['GCash','Cash','Card'].map(m=><option key={m}>{m}</option>)}</select>
-                <div className="input-field" style={{fontSize:12,padding:'6px 10px',fontFamily:"'JetBrains Mono',monospace",color:'var(--text2)',display:'flex',alignItems:'center'}}>{peso(Math.max(0,totalInt-(parseFloat(split1Amt)||0)))}</div>
-              </div>
-            </div>
-          : <>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:5}}>
-                {PAY.map(m=>(
-                  <button key={m.id} onClick={()=>setPayMethod(m.id)} style={{padding:'8px 4px',borderRadius:9,border:'1px solid',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s',fontFamily:'inherit',...(payMethod===m.id?{borderColor:'var(--accent)',background:'rgba(52,211,153,0.08)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text2)'})}}>{m.label}</button>
-                ))}
-              </div>
-              {payMethod==='Cash'&&(
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <input type="number" className="input-field" style={{fontSize:12,padding:'7px 10px',fontFamily:"'JetBrains Mono',monospace"}} placeholder={t('cash_given')} value={cashGiven} onChange={e=>setCashGiven(e.target.value)}/>
-                  {cashGiven&&change>=0&&<span style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:'var(--green)',whiteSpace:'nowrap',fontWeight:600}}>+{peso(change)}</span>}
-                </div>
-              )}
-            </>
-        }
-
         {/* Checkout */}
-        <button onClick={checkout} disabled={items.length===0||checkingOut} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:items.length===0?'var(--bg4)':'var(--accent)',color:items.length===0?'var(--text3)':'#0a0a0a',fontWeight:800,fontSize:14,cursor:items.length===0||checkingOut?'not-allowed':'pointer',fontFamily:'inherit',transition:'all .18s',opacity:checkingOut?0.6:1}}>
-          {checkingOut ? 'Processing…' : `${t('checkout')} — ${peso(totalInt)}`}
+        <button onClick={openCheckout} disabled={items.length===0} style={{width:'100%',padding:13,borderRadius:10,border:'none',background:items.length===0?'var(--bg4)':'var(--accent)',color:items.length===0?'var(--text3)':'var(--accent-dark)',fontWeight:800,fontSize:14,cursor:items.length===0?'not-allowed':'pointer',fontFamily:'inherit',transition:'all .18s'}}>
+          {t('checkout')} — {peso(totalInt)}
         </button>
       </div>
 
-      {/* Receipt Modal */}
-      {showReceipt&&(
-        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}}>
-          <div className="card animate-scale-in" style={{padding:24,width:'min(360px,92vw)',maxHeight:'90vh',overflowY:'auto'}}>
-            <div style={{textAlign:'center',fontWeight:700,fontSize:16,marginBottom:16,color:'var(--green)'}}>✅ {t('payment_success')}</div>
-            <Receipt ref={receiptRef} txn={lastTxn} role={role}/>
+      {/* ══════════ CHECKOUT MODAL ══════════ */}
+      {checkoutOpen&&(
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.55)',padding:16}}>
 
-            {/* Email receipt option */}
-            <div style={{marginTop:16,padding:'10px 12px',borderRadius:10,border:'1px solid var(--border)',background:'var(--bg3)'}}>
-              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12.5,fontWeight:600,color:'var(--text)'}}>
-                <input type="checkbox" checked={emailReceipt} onChange={e=>setEmailReceipt(e.target.checked)} style={{width:15,height:15,accentColor:'var(--accent)',cursor:'pointer'}}/>
-                📧 Email this receipt to the customer
-              </label>
-              {emailReceipt&&(
-                <div style={{display:'flex',gap:6,marginTop:10}}>
-                  <input type="email" className="input-field" style={{fontSize:12,padding:'8px 10px'}} placeholder="customer@gmail.com" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)}/>
-                  <button onClick={sendEmailReceipt} disabled={!customerEmail} className="btn-secondary" style={{padding:'8px 14px',fontSize:12,opacity:customerEmail?1:.5,cursor:customerEmail?'pointer':'not-allowed'}}>Send</button>
+          {/* STEP 1 — Payment method */}
+          {step==='method'&&(
+            <div className="card animate-scale-in" style={{width:'min(440px,94vw)',maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'0 20px 50px rgba(0,0,0,0.25)'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:border,flexShrink:0}}>
+                <div style={{fontSize:16,fontWeight:700,color:'var(--text)'}}>Checkout</div>
+                <button onClick={cancelCheckout} aria-label="Close" style={{width:28,height:28,borderRadius:8,border:'none',background:'var(--bg3)',color:'var(--text3)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+              </div>
+
+              <div style={{overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:16}}>
+                {/* Order summary — totals only; the itemized receipt only appears on the success step */}
+                <div>
+                  <div className="section-title" style={{marginBottom:8}}>Order Summary</div>
+                  <div style={{border,borderRadius:10,overflow:'hidden'}}>
+                    <div style={{padding:'10px 12px',background:'var(--bg3)',fontSize:12.5,display:'flex',flexDirection:'column',gap:4}}>
+                      <div style={{display:'flex',justifyContent:'space-between',color:'var(--text2)'}}><span>{totalItems} item{totalItems===1?'':'s'}</span><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{peso(subtotal)}</span></div>
+                      {discAmt>0&&<div style={{display:'flex',justifyContent:'space-between',color:'var(--red)'}}><span>{t('discount')}</span><span style={{fontFamily:"'JetBrains Mono',monospace"}}>-{peso(discAmt)}</span></div>}
+                      <div style={{display:'flex',justifyContent:'space-between',color:'var(--text2)'}}><span>{t('vat')}</span><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{peso(vat)}</span></div>
+                      <div style={{display:'flex',justifyContent:'space-between',fontWeight:800,fontSize:16,borderTop:'1px solid var(--border2)',paddingTop:7,marginTop:3}}>
+                        <span>{t('total')}</span><span style={{fontFamily:"'JetBrains Mono',monospace",color:'var(--accent)'}}>{peso(totalInt)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
-              <button onClick={closeReceipt} className="btn-secondary" style={{padding:10}}>{t('close')}</button>
-              <button onClick={handlePrint} className="btn-primary" style={{padding:10}}>🖨 {t('print')}</button>
+                {/* Payment method cards */}
+                <div>
+                  <div className="section-title" style={{marginBottom:8}}>Payment Method</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+                    {[...PAY,{id:'Split',label:'Split Payment',icon:Zap}].map(m=>{
+                      const active = m.id==='Split' ? splitMode : (!splitMode&&payMethod===m.id)
+                      return (
+                        <button key={m.id} onClick={()=>m.id==='Split'?setSplitMode(true):(setSplitMode(false),setPayMethod(m.id))}
+                          style={{padding:'12px 10px',borderRadius:10,border:'1.5px solid',fontSize:12.5,fontWeight:700,cursor:'pointer',transition:'all .15s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+                            ...(active?{borderColor:'var(--accent)',background:'var(--accent-tint)',color:'var(--accent)'}:{borderColor:'var(--border)',background:'transparent',color:'var(--text2)'})}}>
+                          <m.icon size={15}/>{m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Method-specific details */}
+                {splitMode ? (
+                  <div>
+                    <div className="section-title" style={{marginBottom:8}}>Split Between</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      <div style={{display:'flex',gap:8}}>
+                        <select className="select-field" style={{width:110,fontSize:12.5}} value={split1Pay} onChange={e=>setSplit1Pay(e.target.value)}>{['Cash','GCash','Card'].map(m=><option key={m}>{m}</option>)}</select>
+                        <input type="number" className="input-field" style={{fontFamily:"'JetBrains Mono',monospace"}} placeholder="Amount (₱)" value={split1Amt} onChange={e=>setSplit1Amt(e.target.value)}/>
+                      </div>
+                      <div style={{display:'flex',gap:8}}>
+                        <select className="select-field" style={{width:110,fontSize:12.5}} value={split2Pay} onChange={e=>setSplit2Pay(e.target.value)}>{['GCash','Cash','Card'].map(m=><option key={m}>{m}</option>)}</select>
+                        <div className="input-field" style={{fontFamily:"'JetBrains Mono',monospace",color:'var(--text2)',display:'flex',alignItems:'center'}}>{peso(Math.max(0,totalInt-(parseFloat(split1Amt)||0)))}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : payMethod==='Cash' ? (
+                  <div>
+                    <div className="section-title" style={{marginBottom:8}}>Cash Payment</div>
+                    <input type="number" className="input-field" style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,marginBottom:10}} placeholder={t('cash_given')} value={cashGiven} onChange={e=>setCashGiven(e.target.value)}/>
+                    <div style={{background:'var(--bg3)',border,borderRadius:10,padding:'10px 14px',display:'flex',flexDirection:'column',gap:5,fontSize:13}}>
+                      <div style={{display:'flex',justifyContent:'space-between',color:'var(--text2)'}}><span>Total Amount</span><span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'var(--text)'}}>{peso(totalInt)}</span></div>
+                      <div style={{display:'flex',justifyContent:'space-between',color:'var(--text2)'}}><span>Cash Received</span><span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'var(--text)'}}>{cashGiven?peso(parseFloat(cashGiven)||0):'—'}</span></div>
+                      <div style={{display:'flex',justifyContent:'space-between',fontWeight:800,borderTop:'1px solid var(--border2)',paddingTop:6,marginTop:1}}>
+                        <span style={{color:'var(--text)'}}>Change</span>
+                        <span style={{fontFamily:"'JetBrains Mono',monospace",color:cashGiven&&change<0?'var(--red)':'var(--green)'}}>{cashGiven?peso(Math.max(0,change)):'—'}</span>
+                      </div>
+                    </div>
+                    {cashGiven&&change<0&&<div style={{marginTop:8,fontSize:11.5,color:'var(--red)',fontWeight:600,display:'flex',alignItems:'center',gap:5}}><AlertTriangle size={13}/>Cash received is less than the total amount.</div>}
+                  </div>
+                ) : payMethod==='GCash' ? (
+                  <div style={{textAlign:'center',background:'var(--bg3)',border,borderRadius:10,padding:'20px 16px'}}>
+                    <Smartphone size={28} style={{marginBottom:8,color:'var(--text2)'}}/>
+                    <div style={{fontWeight:700,fontSize:13.5,color:'var(--text)',marginBottom:4}}>Confirm GCash Payment</div>
+                    <div style={{fontSize:12,color:'var(--text3)'}}>Verify the customer's GCash payment of <strong style={{color:'var(--text2)'}}>{peso(totalInt)}</strong> before completing.</div>
+                  </div>
+                ) : (
+                  <div style={{textAlign:'center',background:'var(--bg3)',border,borderRadius:10,padding:'20px 16px'}}>
+                    <CreditCard size={28} style={{marginBottom:8,color:'var(--text2)'}}/>
+                    <div style={{fontWeight:700,fontSize:13.5,color:'var(--text)',marginBottom:4}}>Confirm Card Payment</div>
+                    <div style={{fontSize:12,color:'var(--text3)'}}>Verify the card payment of <strong style={{color:'var(--text2)'}}>{peso(totalInt)}</strong> before completing.</div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:10,padding:'16px 20px',borderTop:border,flexShrink:0}}>
+                <button onClick={cancelCheckout} className="btn-secondary" style={{padding:12}}>Cancel</button>
+                {(() => {
+                  const cashRequired = !splitMode && payMethod==='Cash' && (!cashGiven.trim() || change<0)
+                  const blocked = cashRequired || checkingOut
+                  return (
+                    <button onClick={handleCompletePayment} disabled={blocked} className="btn-primary" style={{padding:12,opacity:blocked?0.5:1,cursor:blocked?'not-allowed':'pointer'}}>
+                      Complete Payment — {peso(totalInt)}
+                    </button>
+                  )
+                })()}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* STEP 2 — Processing */}
+          {step==='processing'&&(
+            <div className="card animate-scale-in" style={{width:'min(320px,92vw)',padding:'40px 28px',textAlign:'center'}}>
+              <svg className="animate-spin" width="40" height="40" viewBox="0 0 24 24" fill="none" style={{margin:'0 auto 18px'}}>
+                <circle cx="12" cy="12" r="10" stroke="var(--border2)" strokeWidth="3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"/>
+              </svg>
+              <div style={{fontWeight:700,fontSize:15,color:'var(--text)'}}>Processing Payment…</div>
+              <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Please wait a moment</div>
+            </div>
+          )}
+
+          {/* STEP 3 — Success + Receipt */}
+          {step==='success'&&(
+            <div className="animate-scale-in" style={{width: isMobile || !changeAcked ? 'min(380px,94vw)' : 'min(700px,94vw)', maxHeight:'90vh',overflowY:'auto',margin:'0 auto'}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile||!changeAcked?'1fr':'1fr 300px',gap:isMobile?20:28,alignItems:'start'}}>
+
+                {/* LEFT — success info + actions (this column's content swaps; layout size never jumps) */}
+                <div className="card" style={{padding:20}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:20}}>
+                    <div className="animate-pop" style={{width:52,height:52,flexShrink:0,borderRadius:'50%',background:'var(--accent-tint)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:17,color:'var(--text)'}}>Payment Successful!</div>
+                      <div style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:800,fontSize:24,color:'var(--accent)'}}>{peso(totalInt)}</div>
+                    </div>
+                  </div>
+
+                  {!changeAcked ? (
+                    <div>
+                      <div className="animate-pop" style={{
+                          padding:'22px 18px', borderRadius:16, textAlign:'center', marginBottom:16,
+                          background:'linear-gradient(155deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))',
+                          border:'1.5px solid rgba(245,158,11,0.4)',
+                          boxShadow:'0 8px 28px rgba(245,158,11,0.18)',
+                        }}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:11,fontWeight:800,color:'var(--yellow)',textTransform:'uppercase',letterSpacing:'.8px',marginBottom:8}}>
+                          <Banknote size={15}/> Change Due to Customer
+                        </div>
+                        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:44,fontWeight:800,color:'var(--yellow)',lineHeight:1,textShadow:'0 2px 12px rgba(245,158,11,0.35)'}}>{peso(changeDue)}</div>
+                        <div style={{fontSize:11.5,color:'var(--text3)',marginTop:10}}>Please hand this amount back to the customer</div>
+                      </div>
+                      <button onClick={confirmChangeGiven} className="btn-primary" style={{width:'100%',padding:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Check size={15}/>Change Given — Continue</button>
+                    </div>
+                  ) : (
+                    /* Email + actions — revealed once the receipt finishes printing */
+                    <div style={{opacity:actionsVisible?1:0,transition:'opacity .4s ease',pointerEvents:actionsVisible?'auto':'none'}}>
+                      {/* Email receipt option */}
+                      <div style={{padding:'10px 12px',borderRadius:10,border,background:'var(--bg3)'}}>
+                        <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12.5,fontWeight:600,color:'var(--text)'}}>
+                          <input type="checkbox" checked={emailReceipt} onChange={e=>setEmailReceipt(e.target.checked)} style={{width:15,height:15,accentColor:'var(--accent)',cursor:'pointer'}}/>
+                          <Mail size={13} style={{verticalAlign:-2,marginRight:2}}/>Email this receipt to the customer
+                        </label>
+                        {emailReceipt&&(
+                          <div style={{display:'flex',gap:6,marginTop:10}}>
+                            <input type="email" className="input-field" style={{fontSize:12,padding:'8px 10px'}} placeholder="customer@gmail.com" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)}/>
+                            <button onClick={sendEmailReceipt} disabled={!customerEmail} className="btn-secondary" style={{padding:'8px 14px',fontSize:12,opacity:customerEmail?1:.5,cursor:customerEmail?'pointer':'not-allowed'}}>Send</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:12}}>
+                        <button onClick={finishTransaction} className="btn-secondary" style={{padding:10}}>{t('close')}</button>
+                        <button onClick={handlePrint} className="btn-secondary" style={{padding:10,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Printer size={14}/>{t('print')}</button>
+                      </div>
+                      <button onClick={finishTransaction} className="btn-primary" style={{width:'100%',padding:12,marginTop:8}}>New Transaction</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT — printed receipt. Only takes up grid space once the change has been
+                    acknowledged, so the pending "Change Due" box stays centered in a single column. */}
+                {changeAcked&&(
+                  <div key={lastTxn?.id} className="animate-fade-up" style={{display:'flex',flexDirection:'column',justifySelf:isMobile?'stretch':'center'}}>
+                    <div className="receipt-slot"/>
+                    <div className={`receipt-printer${receiptPrinted?' open':''}`}>
+                      <div className="receipt-printer-inner">
+                        <div className="receipt-paper">
+                          <Receipt ref={receiptRef} txn={lastTxn} role={role}/>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

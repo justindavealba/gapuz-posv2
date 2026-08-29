@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { RefreshCw, ClipboardList, FileText } from 'lucide-react'
 import { useRefundStore, useTransactionStore, useAuthStore, useProductStore, useCustomerStore, useAppStore } from '../store'
 import { useToast } from '../utils/toast'
 import { useT, peso, fmtDate, fmtDateTime, REFUND_REASONS, useBreakpoint } from '../utils/helpers'
@@ -18,7 +19,7 @@ const StatusBadge = ({ status, isLight }) => {
     Approved: { bg: '#d1fae5', color: '#047857', border: '#a7f3d0' },
     Rejected: { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
   } : {
-    Pending:  { bg: 'rgba(234,179,8,0.10)',  color: '#eab308', border: 'rgba(234,179,8,0.25)'  },
+    Pending:  { bg: 'rgba(245,158,11,0.10)',  color: '#f59e0b', border: 'rgba(245,158,11,0.25)'  },
     Approved: { bg: 'rgba(52,211,153,0.10)',  color: '#34d399', border: 'rgba(52,211,153,0.25)'  },
     Rejected: { bg: 'rgba(239,68,68,0.10)', color: '#ef4444', border: 'rgba(239,68,68,0.25)' },
   }
@@ -161,7 +162,7 @@ export default function Refunds() {
     // items/status just changed locally via updateRefund, but r is the pre-update
     // object — status doesn't matter for syncRefundToTransaction, only r.items/total do.
     await syncRefundToTransaction(r)
-    toast('Refund approved — items restocked ✓', 'success')
+    toast('Refund approved — items restocked', 'success')
   }
 
   const handleReject = async (r) => {
@@ -186,7 +187,7 @@ export default function Refunds() {
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>🔄 Refunds</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}><RefreshCw size={18} style={{color:'var(--blue)'}}/>Refunds</div>
 
       {/* ══════════════════════════════════
         POLICY POPUP OVERLAY
@@ -359,7 +360,7 @@ export default function Refunds() {
               {/* ── Enhanced Notes Field ── */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700 }}>📝 Additional Notes</label>
+                  <label style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={11} style={{color:'var(--accent)'}}/>Additional Notes</label>
                   <span style={{ fontSize: 9, color: details.notes.length > 200 ? 'var(--red)' : 'var(--text3)' }}>{details.notes.length}/250</span>
                 </div>
                 <div style={{ position: 'relative' }}>
@@ -414,13 +415,13 @@ export default function Refunds() {
               </div>
               {details.notes && (
                 <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>📝 Notes</div>
+                  <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={10} style={{color:'var(--accent)'}}/>Notes</div>
                   <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>{details.notes}</div>
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1 }}>Back</button>
-                <button onClick={handleSubmit} className="btn-primary" style={{ flex: 2 }}>🔄 Submit Refund</button>
+                <button onClick={handleSubmit} className="btn-primary" style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><RefreshCw size={13}/>Submit Refund</button>
               </div>
             </div>
           )}
@@ -429,7 +430,7 @@ export default function Refunds() {
         {/* History Table */}
         <div style={{ ...card, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>📋 Refund History <span style={{ color: 'var(--text3)', fontWeight: 500 }}>({filteredRefunds.length})</span></div>
+            <div style={{ fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}><ClipboardList size={13} style={{color:'var(--accent)'}}/>Refund History <span style={{ color: 'var(--text3)', fontWeight: 500 }}>({filteredRefunds.length})</span></div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {['All', 'Pending', 'Approved', 'Rejected'].map(s => (
                 <button key={s} onClick={() => setFilterStatus(s)} style={{

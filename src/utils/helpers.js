@@ -11,8 +11,8 @@ export const genBarcode = () => 'BC-'+Date.now().toString(36).toUpperCase()
 
 export const stockStatus = (stock) => {
   if(stock===0)  return {label:'Out of stock',cls:'badge-red',   color:'var(--red)',   bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.22)'}
-  if(stock<=5)   return {label:`${stock} left`,cls:'badge-yellow',color:'var(--yellow)',bg:'rgba(234,179,8,0.1)', border:'rgba(234,179,8,0.22)'}
-  return               {label:`${stock} in stock`,cls:'badge-green', color:'var(--green)', bg:'rgba(52,211,153,0.1)',border:'rgba(52,211,153,0.2)'}
+  if(stock<=5)   return {label:`${stock} left`,cls:'badge-yellow',color:'var(--yellow)',bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.22)'}
+  return               {label:`${stock} in stock`,cls:'badge-green', color:'var(--green)', bg:'rgba(34,197,94,0.1)',border:'rgba(34,197,94,0.2)'}
 }
 
 export const getTier = (points) => {
@@ -22,9 +22,20 @@ export const getTier = (points) => {
   return                  {label:'Bronze',  color:'#b45309',icon:'🥉'}
 }
 
-export const CATEGORIES = ['All','Processors','RAM','GPU','Storage','Laptops','Peripherals','Accessories','Services']
 export const REFUND_REASONS = ['Defective product','Wrong item delivered','Customer changed mind','Item not as described','Duplicate purchase','Other']
-export const CAT_COLORS = { Processors:'badge-blue',RAM:'badge-purple',GPU:'badge-accent',Storage:'badge-yellow',Laptops:'badge-green',Peripherals:'badge-cyan',Accessories:'badge-orange',Services:'badge-green' }
+
+// Categories now live in the `categories` table (see useCategoryStore) so admins can
+// add/remove them from the UI. This is just the picker palette for a new category's badge.
+export const BADGE_SWATCHES = [
+  { cls:'badge-blue',   hex:'#3b82f6' },
+  { cls:'badge-purple', hex:'#8b5cf6' },
+  { cls:'badge-accent', hex:'#34d399' },
+  { cls:'badge-yellow', hex:'#eab308' },
+  { cls:'badge-green',  hex:'#22c55e' },
+  { cls:'badge-cyan',   hex:'#06b6d4' },
+  { cls:'badge-orange', hex:'#f97316' },
+  { cls:'badge-red',    hex:'#ef4444' },
+]
 
 export const useT = () => {
   const lang = useAppStore(s=>s.language)

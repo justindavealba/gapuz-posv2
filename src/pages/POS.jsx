@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from 'react'
-import { useCartStore, useHoldStore, useProductStore, useCustomerStore, useAppStore } from '../store'
+import { Package, PauseCircle } from 'lucide-react'
+import { useCartStore, useHoldStore, useProductStore, useCustomerStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, useKeyboardShortcuts, useBreakpoint, CATEGORIES, peso, stockStatus } from '../utils/helpers'
+import { useT, useKeyboardShortcuts, useBreakpoint, peso, stockStatus } from '../utils/helpers'
 import Cart from '../components/Cart'
 
 function ProductCard({ product, onAdd, isLight, bodyText }) {
@@ -12,28 +13,28 @@ function ProductCard({ product, onAdd, isLight, bodyText }) {
 
   return (
     <div onClick={()=>!isOut&&onAdd(product)} style={{
-      background:'var(--bg2)', border:`1px solid ${isLow&&!isOut?'rgba(234,179,8,0.3)':'var(--border)'}`,
+      background:'var(--bg2)', border:`1px solid ${isLow&&!isOut?'rgba(245,158,11,0.3)':'var(--border)'}`,
       borderRadius:12, padding:14, cursor:isOut?'not-allowed':'pointer',
       transition:'all .15s', position:'relative', userSelect:'none', overflow:'hidden', opacity:isOut?.5:1,
     }}
     onMouseEnter={e=>{ if(!isOut){e.currentTarget.style.borderColor='rgba(52,211,153,0.4)';e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)'}}}
-    onMouseLeave={e=>{ e.currentTarget.style.borderColor=isLow?'rgba(234,179,8,0.3)':'var(--border)';e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='none'}}
+    onMouseLeave={e=>{ e.currentTarget.style.borderColor=isLow?'rgba(245,158,11,0.3)':'var(--border)';e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='none'}}
     onMouseDown={e=>{ if(!isOut) e.currentTarget.style.transform='scale(.97)'}}
     onMouseUp={e=>{ if(!isOut) e.currentTarget.style.transform='translateY(-2px)'}}>
-      {isLow&&!isOut&&<div style={{position:'absolute',top:8,right:8,background:'rgba(234,179,8,0.12)',border:'1px solid rgba(234,179,8,0.3)',borderRadius:99,fontSize:9,fontWeight:700,padding:'2px 6px',color:'var(--yellow)'}}>LOW</div>}
+      {isLow&&!isOut&&<div style={{position:'absolute',top:8,right:8,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:99,fontSize:9,fontWeight:700,padding:'2px 6px',color:'var(--yellow)'}}>LOW</div>}
       {isOut&&<div style={{position:'absolute',inset:0,borderRadius:12,background:'rgba(10,10,10,0.75)',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:11,fontWeight:700,color:'var(--red)',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.25)',padding:'4px 12px',borderRadius:99}}>OUT OF STOCK</span></div>}
       <div style={{width:'100%', height:80, background:'var(--bg3)', borderRadius:8, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', border:'1px solid var(--border2)'}}>
         {image && (image.startsWith('data:') || image.startsWith('http')) ? (
           <img src={image} style={{width:'100%', height:'100%', objectFit:'cover'}} alt=""/>
         ) : (
-          <span style={{fontSize:32}}>{image || icon || '📦'}</span>
+          <span style={{fontSize:32}}>{image || icon || <Package size={28} color="var(--text3)"/>}</span>
         )}
       </div>
       <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:6,lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:34}}>{name}</div>
       <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:700,color:bodyText}}>{peso(price)}</div>
       <div style={{display:'inline-flex',alignItems:'baseline',gap:5,marginTop:6,padding:'3px 9px 3px 7px',borderRadius:99,
-        background:isOut?'rgba(239,68,68,0.1)':isLow?'rgba(234,179,8,0.1)':'rgba(52,211,153,0.1)',
-        border:`1px solid ${isOut?'rgba(239,68,68,0.22)':isLow?'rgba(234,179,8,0.22)':'rgba(52,211,153,0.2)'}`}}>
+        background:isOut?'rgba(239,68,68,0.1)':isLow?'rgba(245,158,11,0.1)':'rgba(52,211,153,0.1)',
+        border:`1px solid ${isOut?'rgba(239,68,68,0.22)':isLow?'rgba(245,158,11,0.22)':'rgba(52,211,153,0.2)'}`}}>
         <span style={{width:6,height:6,borderRadius:'50%',background:isOut?'var(--red)':isLow?'var(--yellow)':'var(--green)',flexShrink:0,alignSelf:'center'}}/>
         {!isOut&&<span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:800,color:isLow?'var(--yellow)':'var(--green)',lineHeight:1}}>{stock}</span>}
         <span style={{fontSize:10,fontWeight:600,color:isOut?'var(--red)':isLow?'var(--yellow)':mutedText,letterSpacing:'.01em'}}>{isOut?'Out of stock':isLow?'left':'in stock'}</span>
@@ -46,6 +47,8 @@ export default function POS() {
   const products   = useProductStore(s=>s.products)
   const loading    = useProductStore(s=>s.loading)
   const customers  = useCustomerStore(s=>s.customers)
+  const categories = useCategoryStore(s=>s.categories)
+  const CATEGORIES = ['All', ...categories.map(c=>c.name)]
   const { theme }    = useAppStore()
   const { items, addItem, clearCart, setCustomer } = useCartStore()
   const { holds, removeHold, saveHold } = useHoldStore()
@@ -65,7 +68,7 @@ export default function POS() {
 
   const handleAdd = useCallback(product => {
     const ok = addItem(product)
-    if(ok) toast(product.name+' added ✓','success')
+    if(ok) toast(product.name+' added','success')
     else   toast(t('out_of_stock'),'error')
   },[addItem,toast,t])
 
@@ -80,7 +83,7 @@ export default function POS() {
     if(hold.customerId) setCustomer(hold.customerId)
     removeHold(hold.id)
     setShowHolds(false)
-    toast('Order restored ✓','success')
+    toast('Order restored','success')
   }
 
   const filtered = products
@@ -144,7 +147,7 @@ export default function POS() {
                 ))}
               </div>
           : filtered.length===0
-            ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:mutedText,gap:8}}><span style={{fontSize:40,opacity:.2}}>📦</span><span>{t('no_data')}</span></div>
+            ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:mutedText,gap:8}}><Package size={36} style={{opacity:.2}}/><span>{t('no_data')}</span></div>
             : <div style={{display:'grid',gap:10,gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?120:148}px,1fr))`,alignContent:'start'}}>
                 {filtered.map(p=><ProductCard key={p.id} product={p} onAdd={handleAdd} isLight={isLight} bodyText={bodyText}/>)}
               </div>
@@ -176,11 +179,11 @@ export default function POS() {
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)'}} onClick={e=>e.target===e.currentTarget&&setShowHolds(false)}>
           <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:24,maxHeight:'70vh',overflowY:'auto'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div style={{fontWeight:700,fontSize:15}}>⏸️ Held Orders</div>
+              <div style={{fontWeight:700,fontSize:15,display:'flex',alignItems:'center',gap:6}}><PauseCircle size={15} style={{color:'var(--yellow)'}}/>Held Orders</div>
               <button onClick={()=>setShowHolds(false)} style={{background:'none',border:'none',color:mutedText,cursor:'pointer',fontSize:20}}>×</button>
             </div>
             {holds.length===0
-              ? <div style={{textAlign:'center',color:mutedText,padding:32}}><div style={{fontSize:36,opacity:.2,marginBottom:8}}>⏸️</div>No held orders</div>
+              ? <div style={{textAlign:'center',color:mutedText,padding:32}}><PauseCircle size={30} style={{opacity:.2,marginBottom:8}}/><div>No held orders</div></div>
               : holds.map(h=>(
                 <div key={h.id} className="card-surface" style={{padding:14,marginBottom:8,display:'flex',alignItems:'center',gap:12}}>
                   <div style={{flex:1}}>

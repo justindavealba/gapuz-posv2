@@ -1,9 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Users, Plus, Pencil, ClipboardList, Award, ShoppingCart } from 'lucide-react'
 import { useCustomerStore, useTransactionStore } from '../store'
 import { useToast } from '../utils/toast'
 import { useT, peso, fmtDate, getTier } from '../utils/helpers'
 
 const EMPTY = { name:'', email:'', phone:'', address:'' }
+
+const AVATAR_COLORS = [
+  { bg: 'var(--accent)', fg: '#0a0a0a' },
+  { bg: 'var(--blue)',   fg: '#ffffff' },
+  { bg: 'var(--purple)', fg: '#ffffff' },
+  { bg: 'var(--yellow)', fg: '#0a0a0a' },
+  { bg: 'var(--red)',    fg: '#ffffff' },
+  { bg: 'var(--green)',  fg: '#ffffff' },
+  { bg: 'var(--orange)', fg: '#ffffff' },
+]
+const avatarColor = (seed) => {
+  let hash = 0
+  const s = String(seed)
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
 
 export default function Customers() {
   const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore()
@@ -14,6 +31,8 @@ export default function Customers() {
   const [form,     setForm]     = useState(EMPTY)
   const [selected, setSelected] = useState(null)
   const [sortBy,   setSortBy]   = useState('name')
+  const [page,     setPage]     = useState(1)
+  const PAGE_SIZE = 6
   const toast = useToast()
   const t     = useT()
 
@@ -38,17 +57,22 @@ export default function Customers() {
     .filter(c=>!search||c.name.toLowerCase().includes(search.toLowerCase())||(c.phone||'').includes(search)||(c.email||'').toLowerCase().includes(search.toLowerCase()))
     .sort((a,b)=>{ if(sortBy==='name') return a.name.localeCompare(b.name); if(sortBy==='points') return b.points-a.points; if(sortBy==='spent') return b.totalSpent-a.totalSpent; if(sortBy==='purchases') return b.purchases-a.purchases; return 0 })
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE))
+  useEffect(()=>{ setPage(1) }, [search, sortBy])
+  useEffect(()=>{ if(page>totalPages) setPage(totalPages) }, [totalPages])
+  const pageItems = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
+
   const custTxns = selected ? transactions.filter(tx=>tx.customerId===selected.id) : []
 
   return (
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column',padding:20,gap:16}}>
       <div className="page-header">
-        <div className="page-title">👥 {t('customers')}</div>
+        <div className="page-title" style={{display:'flex',alignItems:'center',gap:8}}><Users size={18} style={{color:'var(--accent)'}}/>{t('customers')}</div>
         <button onClick={openAdd} className="btn-primary">+ {t('add_customer')}</button>
       </div>
 
       <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap'}}>
-        <input className="input-field" style={{maxWidth:280,minWidth:180,flex:1}} placeholder="🔍 Search customers..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        <input className="input-field" style={{maxWidth:280,minWidth:180,flex:1}} placeholder="Search customers..." value={search} onChange={e=>setSearch(e.target.value)}/>
         <select className="select-field" value={sortBy} onChange={e=>setSortBy(e.target.value)}>
           <option value="name">Name A–Z</option>
           <option value="points">Most Points</option>
@@ -70,10 +94,10 @@ export default function Customers() {
                 </div>
               </td></tr>
               :filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
-              :filtered.map(c=>{ const tier=getTier(c.points); return (
+              :pageItems.map(c=>{ const tier=getTier(c.points); return (
                 <tr key={c.id}>
                   <td><div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <div style={{width:32,height:32,borderRadius:8,background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#0a0a0a',flexShrink:0}}>{c.name.charAt(0).toUpperCase()}</div>
+                    <div style={{width:32,height:32,borderRadius:8,background:avatarColor(c.id).bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:avatarColor(c.id).fg,flexShrink:0}}>{c.name.charAt(0).toUpperCase()}</div>
                     <div><div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{c.name}</div><div style={{fontSize:11.5,color:'var(--text2)',marginTop:2}}>{c.email||'No email'}</div></div>
                   </div></td>
                   <td style={{fontSize:12,color:'var(--text2)'}}>{c.phone||'—'}</td>
@@ -93,12 +117,23 @@ export default function Customers() {
           </table>
         </div>
       </div>
+      {totalPages>1&&(
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,flexShrink:0,paddingTop:4}}>
+          <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:page===1?0.5:1,cursor:page===1?'not-allowed':'pointer'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{page} of {totalPages}</div>
+          <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:page===totalPages?0.5:1,cursor:page===totalPages?'not-allowed':'pointer'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {(modal==='add'||modal==='edit')&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
           <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:28}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>{modal==='add'?`➕ ${t('add_customer')}`:`✏️ ${t('edit_customer')}`}</div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:20,display:'flex',alignItems:'center',gap:6}}>{modal==='add'?<><Plus size={14} style={{color:'var(--green)'}}/>{t('add_customer')}</>:<><Pencil size={14} style={{color:'var(--blue)'}}/>{t('edit_customer')}</>}</div>
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
               {[['name',t('full_name'),'Juan dela Cruz','text'],['email',t('email_addr'),'juan@email.com','email'],['phone',t('phone'),'0917-123-4567','text'],['address',t('address'),'Cagayan de Oro City','text']].map(([key,label,ph,type])=>(
                 <div key={key}><label style={{fontSize:10,color:'var(--text3)',display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{label}</label><input className="input-field" type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}/></div>
@@ -111,10 +146,10 @@ export default function Customers() {
 
       {/* History Modal */}
       {modal==='history'&&(
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
           <div className="card animate-scale-in" style={{width:'min(520px,92vw)',padding:24,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div><div style={{fontSize:15,fontWeight:700}}>📋 {t('purchase_history')}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{selected?.name}</div></div>
+              <div><div style={{fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:6}}><ClipboardList size={14} style={{color:'var(--accent)'}}/>{t('purchase_history')}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{selected?.name}</div></div>
               <button onClick={()=>setModal(null)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:20}}>×</button>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
@@ -127,7 +162,7 @@ export default function Customers() {
             </div>
             {/* Tier criteria */}
             <div style={{marginBottom:12,padding:12,background:'var(--bg2)',borderRadius:10}}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:8}}>🏅 Loyalty Tier Criteria</div>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><Award size={11} style={{color:'var(--purple)'}}/>Loyalty Tier Criteria</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:6}}>
                 {[
                   {tier:'Bronze', range:'0–499',    color:'var(--accent)', icon:'🥉', current:(selected?.points||0)<500},
@@ -152,7 +187,7 @@ export default function Customers() {
                 </svg>
                 Loading history…
               </div>
-              :custTxns.length===0?<div style={{textAlign:'center',padding:32,color:'var(--text3)'}}><div style={{fontSize:36,opacity:.2,marginBottom:8}}>🛒</div>{t('no_purchases')}</div>
+              :custTxns.length===0?<div style={{textAlign:'center',padding:32,color:'var(--text3)'}}><ShoppingCart size={32} style={{opacity:.2,marginBottom:8}}/>{t('no_purchases')}</div>
               :custTxns.map(tx=>{
                 const isRefunded  = tx.status==='Refunded'
                 const isVoided    = isRefunded||tx.status==='Partially Refunded'
@@ -168,9 +203,9 @@ export default function Customers() {
                     <span style={{fontSize:10,color:'var(--text3)'}}>{tx.payment}{!isVoided&&` · +${10 + Math.floor(tx.total/100)} pts earned`}</span>
                     {isVoided&&(
                       <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:9,fontWeight:700,padding:'2px 8px',borderRadius:99,textTransform:'uppercase',letterSpacing:'.4px',
-                        background:isRefunded?'rgba(239,68,68,0.1)':'rgba(234,179,8,0.1)',
+                        background:isRefunded?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',
                         color:isRefunded?'var(--red)':'var(--yellow)',
-                        border:`1px solid ${isRefunded?'rgba(239,68,68,0.25)':'rgba(234,179,8,0.25)'}`}}>
+                        border:`1px solid ${isRefunded?'rgba(239,68,68,0.25)':'rgba(245,158,11,0.25)'}`}}>
                         ↩ {isRefunded?'Refunded':'Partially Refunded'}
                       </span>
                     )}

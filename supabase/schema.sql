@@ -126,6 +126,26 @@ CREATE TABLE holds (
   saved_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 8. CATEGORIES (product category list — lets admins add/remove categories from the UI
+--    instead of hardcoding them in the frontend)
+CREATE TABLE categories (
+  category_id SERIAL PRIMARY KEY,
+  name        VARCHAR(50) NOT NULL UNIQUE,
+  badge_color VARCHAR(20) NOT NULL DEFAULT 'badge-accent',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO categories (name, badge_color, sort_order) VALUES
+('Processors',  'badge-blue',   1),
+('RAM',         'badge-purple', 2),
+('GPU',         'badge-accent', 3),
+('Storage',     'badge-yellow', 4),
+('Laptops',     'badge-green',  5),
+('Peripherals', 'badge-cyan',   6),
+('Accessories', 'badge-orange', 7),
+('Services',    'badge-green',  8);
+
 -- ROW LEVEL SECURITY
 ALTER TABLE profiles          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products          ENABLE ROW LEVEL SECURITY;
@@ -134,6 +154,7 @@ ALTER TABLE transactions      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transaction_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refunds           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE holds             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories        ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated read" ON profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON products FOR SELECT TO authenticated USING (true);
@@ -142,6 +163,7 @@ CREATE POLICY "Allow authenticated read" ON transactions FOR SELECT TO authentic
 CREATE POLICY "Allow authenticated read" ON transaction_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON refunds FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON holds FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow authenticated read" ON categories FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Allow authenticated insert" ON transactions FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON transaction_items FOR INSERT TO authenticated WITH CHECK (true);
@@ -149,15 +171,18 @@ CREATE POLICY "Allow authenticated insert" ON refunds FOR INSERT TO authenticate
 CREATE POLICY "Allow authenticated insert" ON customers FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON products FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON holds FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Allow authenticated insert" ON categories FOR INSERT TO authenticated WITH CHECK (true);
 
 CREATE POLICY "Allow authenticated update" ON products FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated update" ON customers FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated update" ON refunds FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated update" ON transactions FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Allow authenticated update" ON categories FOR UPDATE TO authenticated USING (true);
 
 CREATE POLICY "Allow authenticated delete" ON products FOR DELETE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated delete" ON holds FOR DELETE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated delete" ON customers FOR DELETE TO authenticated USING (true);
+CREATE POLICY "Allow authenticated delete" ON categories FOR DELETE TO authenticated USING (true);
 
 -- INDEXES
 CREATE INDEX idx_transactions_customer   ON transactions(customer_id);
@@ -169,7 +194,13 @@ CREATE INDEX idx_refunds_status          ON refunds(status);
 CREATE INDEX idx_products_category       ON products(category);
 
 -- VIEWS
-CREATE VIEW sales_summary AS
+-- security_invoker = true makes each view run with the querying user's own
+-- permissions (and RLS) instead of the view owner's — otherwise Postgres
+-- defaults views to definer-style access, which bypasses RLS on the
+-- underlying tables and trips Supabase's linter (see fix_security_definer_views.sql
+-- for applying this to an already-deployed database).
+CREATE VIEW sales_summary
+WITH (security_invoker = true) AS
 SELECT DATE(t.created_at)      AS sale_date,
        COUNT(t.transaction_id) AS total_transactions,
        SUM(t.subtotal)         AS total_subtotal,
@@ -181,7 +212,8 @@ FROM transactions t
 GROUP BY DATE(t.created_at), t.payment
 ORDER BY sale_date DESC;
 
-CREATE VIEW product_sales AS
+CREATE VIEW product_sales
+WITH (security_invoker = true) AS
 SELECT p.product_id, p.name, p.category, p.price, p.cost_price, p.stock, p.sold,
        ROUND(((p.price - p.cost_price) / NULLIF(p.price, 0)) * 100, 2) AS margin_percent,
        CASE
@@ -192,7 +224,8 @@ SELECT p.product_id, p.name, p.category, p.price, p.cost_price, p.stock, p.sold,
 FROM products p
 ORDER BY p.sold DESC;
 
-CREATE VIEW customer_loyalty AS
+CREATE VIEW customer_loyalty
+WITH (security_invoker = true) AS
 SELECT c.customer_id, c.name, c.points, c.purchases, c.total_spent,
        CASE
          WHEN c.points >= 3000 THEN 'Platinum'

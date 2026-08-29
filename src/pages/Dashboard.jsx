@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { Trophy, TrendingDown, AlertTriangle, Ban, CheckCircle2, Package, Wallet, Award, Star, RefreshCw, ClipboardList, Hand } from 'lucide-react'
 import { useTransactionStore, useProductStore, useAuthStore, useCustomerStore, useRefundStore } from '../store'
 import { useT, peso, pesoCompact, getTier } from '../utils/helpers'
 import { CHART_COLORS, ACCENT, RED, YELLOW, PURPLE, SLATE } from '../utils/colors'
@@ -12,12 +13,12 @@ const TabIcon = ({ children }) => (
   </svg>
 )
 
-const TABS = [
+const ALL_TABS = [
   { id:'overview',  label:'Overview',  icon: <TabIcon><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></TabIcon> },
   { id:'inventory', label:'Inventory', icon: <TabIcon><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></TabIcon> },
-  { id:'customers', label:'Customers', icon: <TabIcon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></TabIcon> },
-  { id:'refunds',   label:'Refunds',   icon: <TabIcon><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></TabIcon> },
-  { id:'reports',   label:'Reports',   icon: <TabIcon><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></TabIcon> },
+  { id:'customers', label:'Customers', icon: <TabIcon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></TabIcon>, adminOnly:true },
+  { id:'refunds',   label:'Refunds',   icon: <TabIcon><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></TabIcon>, adminOnly:true },
+  { id:'reports',   label:'Reports',   icon: <TabIcon><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></TabIcon>, adminOnly:true },
 ]
 
 function MetricCard({ label, value, sub, subUp, color }) {
@@ -44,10 +45,16 @@ export default function Dashboard() {
   const products     = useProductStore(s=>s.products)
   const customers    = useCustomerStore(s=>s.customers)
   const refunds      = useRefundStore(s=>s.refunds)
-  const { user }     = useAuthStore()
+  const { user, role } = useAuthStore()
+  const isAdmin      = role === 'admin'
+  const TABS         = useMemo(()=>ALL_TABS.filter(tab=>!tab.adminOnly||isAdmin),[isAdmin])
   const t            = useT()
   const [activeTab,  setActiveTab] = useState('overview')
   const [repPeriod,  setRepPeriod] = useState('today')
+  const [leastPage,  setLeastPage] = useState(1)
+  const [txPage,     setTxPage]    = useState(1)
+  const LEAST_PAGE_SIZE = 5
+  const TX_PAGE_SIZE    = 7
 
   const now   = new Date()
   const today = new Date(now); today.setHours(0,0,0,0)
@@ -66,7 +73,13 @@ export default function Dashboard() {
   const areaData  = useMemo(()=>Array.from({length:14},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(13-i)); d.setHours(0,0,0,0); const dt=transactions.filter(tx=>{ const td=new Date(tx.createdAt); td.setHours(0,0,0,0); return td.getTime()===d.getTime() }); return {label:d.toLocaleDateString('en-PH',{month:'short',day:'numeric'}),revenue:dt.reduce((s,t)=>s+t.total,0)} }),[transactions])
   const payBreak  = useMemo(()=>{ const map={}; transactions.forEach(t=>{map[t.payment]=(map[t.payment]||0)+t.total}); return Object.entries(map).map(([name,value])=>({name,value})) },[transactions])
   const topProds  = useMemo(()=>{ const map={}; transactions.forEach(tx=>(tx.items||[]).forEach(i=>{ if(!map[i.name]) map[i.name]={name:i.name,sold:0,revenue:0}; map[i.name].sold+=i.qty; map[i.name].revenue+=i.qty*i.price })); return Object.values(map).sort((a,b)=>b.sold-a.sold).slice(0,5) },[transactions])
-  const leastProds= useMemo(()=>{ const map={}; transactions.forEach(tx=>(tx.items||[]).forEach(i=>{ if(!map[i.name]) map[i.name]={name:i.name,sold:0,revenue:0}; map[i.name].sold+=i.qty; map[i.name].revenue+=i.qty*i.price })); products.forEach(p=>{ if(!map[p.name]) map[p.name]={name:p.name,sold:0,revenue:0} }); return Object.values(map).sort((a,b)=>a.sold-b.sold).slice(0,5) },[transactions,products])
+  const leastProds= useMemo(()=>{ const map={}; transactions.forEach(tx=>(tx.items||[]).forEach(i=>{ if(!map[i.name]) map[i.name]={name:i.name,sold:0,revenue:0}; map[i.name].sold+=i.qty; map[i.name].revenue+=i.qty*i.price })); products.forEach(p=>{ if(!map[p.name]) map[p.name]={name:p.name,sold:0,revenue:0} }); return Object.values(map).sort((a,b)=>a.sold-b.sold) },[transactions,products])
+  const leastTotalPages = Math.max(1, Math.ceil(leastProds.length/LEAST_PAGE_SIZE))
+  const leastPageItems  = useMemo(()=>leastProds.slice((leastPage-1)*LEAST_PAGE_SIZE, leastPage*LEAST_PAGE_SIZE),[leastProds,leastPage])
+  const txTotalPages    = Math.max(1, Math.ceil(transactions.length/TX_PAGE_SIZE))
+  const txPageItems     = useMemo(()=>transactions.slice((txPage-1)*TX_PAGE_SIZE, txPage*TX_PAGE_SIZE),[transactions,txPage])
+  useEffect(()=>{ if(leastPage>leastTotalPages) setLeastPage(leastTotalPages) },[leastTotalPages])
+  useEffect(()=>{ if(txPage>txTotalPages) setTxPage(txTotalPages) },[txTotalPages])
 
   // ── INVENTORY ANALYTICS ───────────────────────────────────
   const totalValue = products.reduce((s,p)=>s+p.price*p.stock,0)
@@ -128,7 +141,7 @@ export default function Dashboard() {
 
       {/* HEADER */}
       <div>
-        <div style={{fontSize:20,fontWeight:700}}>{greeting}, <span style={{color:'var(--accent)'}}>{user?.user_metadata?.name||'Admin'}</span> 👋</div>
+        <div style={{fontSize:24,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>{greeting}, <span style={{color:'var(--accent)'}}>{user?.user_metadata?.name||'Admin'}</span><Hand size={22} style={{color:'var(--yellow)'}}/></div>
         <div style={{color:'var(--text2)',fontSize:13,marginTop:3}}>{now.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
       </div>
 
@@ -136,15 +149,8 @@ export default function Dashboard() {
       <div style={{display:'flex',gap:6,borderBottom:'1px solid var(--border)',paddingBottom:0,overflowX:'auto',flexShrink:0}}>
         {TABS.map(tab=>(
           <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-            style={{
-              display:'flex',alignItems:'center',gap:7,whiteSpace:'nowrap',
-              padding:'9px 18px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
-              borderRadius:'8px 8px 0 0',transition:'all .15s',
-              background: activeTab===tab.id ? 'var(--accent)' : 'var(--bg2)',
-              color:       activeTab===tab.id ? '#0a0a0a'       : 'var(--text3)',
-              borderBottom: activeTab===tab.id ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: activeTab===tab.id ? '-1px' : '0',
-            }}>
+            className={`tab-btn${activeTab===tab.id?' active':''}`}
+            style={{ marginBottom: activeTab===tab.id ? '-1px' : '0' }}>
             {tab.icon}{tab.label}
           </button>
         ))}
@@ -153,49 +159,53 @@ export default function Dashboard() {
       {/* ══════════ OVERVIEW TAB ══════════ */}
       {activeTab==='overview' && <>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:14}}>
-          <MetricCard label={t('today_revenue')} value={pesoCompact(revenue)} sub={`${revChange>=0?'▲ +':'▼ '}${revChange}% ${t('vs_yesterday')}`} subUp={revChange>=0} color="var(--accent)"/>
+          {isAdmin && <MetricCard label={t('today_revenue')} value={pesoCompact(revenue)} sub={`${revChange>=0?'▲ +':'▼ '}${revChange}% ${t('vs_yesterday')}`} subUp={revChange>=0} color="var(--accent)"/>}
           <MetricCard label={t('transactions')} value={todayTxns.length} sub="Today" subUp color="var(--green)"/>
           <MetricCard label={t('items_sold')} value={itemsSold} sub="Today" subUp color="var(--purple)"/>
-          <MetricCard label={t('avg_order')} value={pesoCompact(aov)} sub="Today" subUp color="var(--yellow)"/>
+          {isAdmin && <MetricCard label={t('avg_order')} value={pesoCompact(aov)} sub="Today" subUp color="var(--yellow)"/>}
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:14}}>
-          <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>Revenue — Last 14 Days</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={areaData}>
-                <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={ACCENT} stopOpacity={0.25}/><stop offset="95%" stopColor={ACCENT} stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)"/>
-                <XAxis dataKey="label" tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} interval={1}/>
-                <YAxis tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
-                <Tooltip content={<Tip/>}/>
-                <Area type="monotone" dataKey="revenue" stroke={ACCENT} strokeWidth={2} fill="url(#rg)"/>
-              </AreaChart>
-            </ResponsiveContainer>
+        {isAdmin && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:14}}>
+            <div className="card" style={{padding:20}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>Revenue — Last 14 Days</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={areaData}>
+                  <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={ACCENT} stopOpacity={0.25}/><stop offset="95%" stopColor={ACCENT} stopOpacity={0}/></linearGradient></defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)"/>
+                  <XAxis dataKey="label" tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} interval={1}/>
+                  <YAxis tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
+                  <Tooltip content={<Tip/>}/>
+                  <Area type="monotone" dataKey="revenue" stroke={ACCENT} strokeWidth={2} fill="url(#rg)"/>
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="card" style={{padding:20}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>Payment Methods</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart><Pie data={payBreak} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>{payBreak.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>peso(v)}/><Legend iconSize={8} wrapperStyle={{fontSize:11}}/></PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>Payment Methods</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart><Pie data={payBreak} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>{payBreak.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>peso(v)}/><Legend iconSize={8} wrapperStyle={{fontSize:11}}/></PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
+          {isAdmin && (
+            <div className="card" style={{padding:20}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>{t('weekly_sales')}</div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={weekData} barSize={28}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                  <XAxis dataKey="label" tick={{fontSize:11,fill:'var(--text3)'}} tickLine={false} axisLine={false}/>
+                  <YAxis tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
+                  <Tooltip formatter={v=>peso(v)} cursor={{fill:'rgba(255,255,255,0.03)'}}/>
+                  <Bar dataKey="value" radius={[5,5,0,0]}>{weekData.map((_,i)=><Cell key={i} fill={i===weekData.length-1?ACCENT:'var(--bg5)'}/>)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>{t('weekly_sales')}</div>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={weekData} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                <XAxis dataKey="label" tick={{fontSize:11,fill:'var(--text3)'}} tickLine={false} axisLine={false}/>
-                <YAxis tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
-                <Tooltip formatter={v=>peso(v)} cursor={{fill:'rgba(255,255,255,0.03)'}}/>
-                <Bar dataKey="value" radius={[5,5,0,0]}>{weekData.map((_,i)=><Cell key={i} fill={i===weekData.length-1?ACCENT:'var(--bg5)'}/>)}</Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>🏆 {t('top_products')}</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><Trophy size={13} style={{color:'var(--yellow)'}}/>{t('top_products')}</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {topProds.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:'20px 0'}}>{t('no_data')}</div>
               :topProds.map((p,i)=>(
@@ -206,7 +216,7 @@ export default function Dashboard() {
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:COLORS[i],width:`${Math.round((p.sold/(topProds[0]?.sold||1))*100)}%`,transition:'width .5s'}}/></div>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--green)'}}>{peso(p.revenue)}</div>
+                    {isAdmin && <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--green)'}}>{peso(p.revenue)}</div>}
                     <div style={{fontSize:10,color:'var(--text3)'}}>{p.sold} sold</div>
                   </div>
                 </div>
@@ -217,24 +227,35 @@ export default function Dashboard() {
 
         {/* LEAST SELLING */}
         <div className="card" style={{padding:20,borderTop:'2px solid var(--red)'}}>
-          <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>📉 Least Selling Products</div>
+          <div style={{fontWeight:600,fontSize:13,marginBottom:4,display:'flex',alignItems:'center',gap:6}}><TrendingDown size={13} style={{color:'var(--red)'}}/>Least Selling Products</div>
           <div style={{fontSize:11,color:'var(--text3)',marginBottom:14}}>Products with the lowest sales — consider promotions or restocking decisions</div>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {leastProds.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:'20px 0'}}>No sales data yet.</div>
-            :leastProds.map((p,i)=>(
+            :leastPageItems.map((p,i)=>(
               <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:18}}>{(leastPage-1)*LEAST_PAGE_SIZE+i+1}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                   <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--red)',width:p.sold===0?'4%':`${Math.min(100,Math.round((p.sold/(topProds[0]?.sold||1))*100))}%`,transition:'width .5s'}}/></div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)'}}>{peso(p.revenue)}</div>
+                  {isAdmin && <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)'}}>{peso(p.revenue)}</div>}
                   <div style={{fontSize:10,color:'var(--text3)'}}>{p.sold} sold</div>
                 </div>
               </div>
             ))}
           </div>
+          {leastTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginTop:16}}>
+              <button onClick={()=>setLeastPage(p=>Math.max(1,p-1))} disabled={leastPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:leastPage===1?0.5:1,cursor:leastPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{leastPage} of {leastTotalPages}</div>
+              <button onClick={()=>setLeastPage(p=>Math.min(leastTotalPages,p+1))} disabled={leastPage===leastTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:leastPage===leastTotalPages?0.5:1,cursor:leastPage===leastTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ALERTS */}
@@ -242,17 +263,17 @@ export default function Dashboard() {
           <div className="section-title">{t('ai_insights')}</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
             <div className="card" style={{padding:16,borderTop:'2px solid var(--yellow)'}}>
-              <div style={{fontSize:20,marginBottom:8}}>⚠️</div>
+              <AlertTriangle size={20} style={{marginBottom:8,color:'var(--yellow)'}}/>
               <div style={{fontWeight:600,fontSize:12,color:'var(--yellow)',marginBottom:4}}>{t('low_stock_alert')}</div>
               <div style={{fontSize:11,color:'var(--text2)',lineHeight:1.5}}>{lowStock.length===0?'All products have healthy stock.':`${lowStock.length} product(s) running low: ${lowStock.map(p=>p.name).slice(0,2).join(', ')}${lowStock.length>2?'...':''}`}</div>
             </div>
             <div className="card" style={{padding:16,borderTop:`2px solid ${outStock.length?'var(--red)':'var(--green)'}`}}>
-              <div style={{fontSize:20,marginBottom:8}}>{outStock.length?'🚫':'✅'}</div>
+              {outStock.length?<Ban size={20} style={{marginBottom:8,color:'var(--red)'}}/>:<CheckCircle2 size={20} style={{marginBottom:8,color:'var(--green)'}}/>}
               <div style={{fontWeight:600,fontSize:12,color:outStock.length?'var(--red)':'var(--green)',marginBottom:4}}>{t('out_of_stock_alert')}</div>
               <div style={{fontSize:11,color:'var(--text2)',lineHeight:1.5}}>{outStock.length===0?'No products are out of stock.':`${outStock.length} item(s) need restocking.`}</div>
             </div>
             <div className="card" style={{padding:16,borderTop:'2px solid var(--red)'}}>
-              <div style={{fontSize:20,marginBottom:8}}>📉</div>
+              <TrendingDown size={20} style={{marginBottom:8,color:'var(--red)'}}/>
               <div style={{fontWeight:600,fontSize:12,color:'var(--red)',marginBottom:4}}>Least Selling</div>
               <div style={{fontSize:11,color:'var(--text2)',lineHeight:1.5}}>{leastProds[0]?`${leastProds[0].name} — only ${leastProds[0].sold} unit(s) sold`:'No sales data yet.'}</div>
             </div>
@@ -267,7 +288,7 @@ export default function Dashboard() {
               <thead><tr>{['TXN #','Time','Customer','Items','Payment','Total'].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {transactions.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
-                :transactions.slice(0,8).map(tx=>(
+                :txPageItems.map(tx=>(
                   <tr key={tx.id}>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--accent)'}}>#{String(tx.id).padStart(4,'0')}</td>
                     <td style={{fontSize:11,color:'var(--text3)'}}>{new Date(tx.createdAt).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td>
@@ -280,6 +301,17 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          {txTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginTop:12}}>
+              <button onClick={()=>setTxPage(p=>Math.max(1,p-1))} disabled={txPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:txPage===1?0.5:1,cursor:txPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{txPage} of {txTotalPages}</div>
+              <button onClick={()=>setTxPage(p=>Math.min(txTotalPages,p+1))} disabled={txPage===txTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:txPage===txTotalPages?0.5:1,cursor:txPage===txTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
       </>}
 
@@ -287,36 +319,38 @@ export default function Dashboard() {
       {activeTab==='inventory' && <>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:14}}>
           <StatCard label="Total Products"   value={products.length}      color="var(--accent)"/>
-          <StatCard label="Inventory Value"  value={peso(totalValue)}     color="var(--green)"/>
+          {isAdmin && <StatCard label="Inventory Value"  value={peso(totalValue)}     color="var(--green)"/>}
           <StatCard label="Low Stock Items"  value={lowStock.length}      color="var(--yellow)"/>
           <StatCard label="Out of Stock"     value={outStock.length}      color="var(--red)"/>
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>📦 Products by Category</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><Package size={13} style={{color:'var(--blue)'}}/>Products by Category</div>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart><Pie data={catData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>{catData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip/><Legend iconSize={8} wrapperStyle={{fontSize:11}}/></PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>💰 Revenue by Category</div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={catRevenue} layout="vertical" barSize={14}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false}/>
-                <XAxis type="number" tick={{fontSize:9,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
-                <YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} width={80}/>
-                <Tooltip formatter={v=>peso(v)}/>
-                <Bar dataKey="value" fill={ACCENT} radius={[0,4,4,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {isAdmin && (
+            <div className="card" style={{padding:20}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><Wallet size={13} style={{color:'var(--green)'}}/>Revenue by Category</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={catRevenue} layout="vertical" barSize={14}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false}/>
+                  <XAxis type="number" tick={{fontSize:9,fill:'var(--text3)'}} tickLine={false} axisLine={false} tickFormatter={v=>v>=1000?Math.round(v/1000)+'k':v}/>
+                  <YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'var(--text3)'}} tickLine={false} axisLine={false} width={80}/>
+                  <Tooltip formatter={v=>peso(v)}/>
+                  <Bar dataKey="value" fill={ACCENT} radius={[0,4,4,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20,borderTop:'2px solid var(--yellow)'}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>⚠️ Low Stock Products</div>
-            {lowStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>All products have healthy stock! ✅</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><AlertTriangle size={13} style={{color:'var(--yellow)'}}/>Low Stock Products</div>
+            {lowStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>All products have healthy stock!</div>
             :lowStock.map(p=>(
               <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <div>
@@ -328,8 +362,8 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="card" style={{padding:20,borderTop:'2px solid var(--red)'}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>🚫 Out of Stock Products</div>
-            {outStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No out of stock products! ✅</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><Ban size={13} style={{color:'var(--red)'}}/>Out of Stock Products</div>
+            {outStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No out of stock products!</div>
             :outStock.map(p=>(
               <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <div>
@@ -344,7 +378,7 @@ export default function Dashboard() {
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20,borderTop:'2px solid var(--accent)'}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>🏆 Top Selling Products</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><Trophy size={13} style={{color:'var(--yellow)'}}/>Top Selling Products</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {topProds.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No sales data yet.</div>
               :topProds.map((p,i)=>(
@@ -355,7 +389,7 @@ export default function Dashboard() {
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--accent)',width:`${Math.round((p.sold/(topProds[0]?.sold||1))*100)}%`}}/></div>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontSize:11,color:'var(--green)',fontFamily:"'JetBrains Mono',monospace"}}>{peso(p.revenue)}</div>
+                    {isAdmin && <div style={{fontSize:11,color:'var(--green)',fontFamily:"'JetBrains Mono',monospace"}}>{peso(p.revenue)}</div>}
                     <div style={{fontSize:10,color:'var(--text3)'}}>{p.sold} sold</div>
                   </div>
                 </div>
@@ -363,23 +397,34 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="card" style={{padding:20,borderTop:'2px solid var(--red)'}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>📉 Least Selling Products</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><TrendingDown size={13} style={{color:'var(--red)'}}/>Least Selling Products</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {leastProds.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No sales data yet.</div>
-              :leastProds.map((p,i)=>(
+              :leastPageItems.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
-                  <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:18}}>{(leastPage-1)*LEAST_PAGE_SIZE+i+1}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--red)',width:p.sold===0?'4%':`${Math.min(100,Math.round((p.sold/(topProds[0]?.sold||1))*100))}%`}}/></div>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace"}}>{peso(p.revenue)}</div>
+                    {isAdmin && <div style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace"}}>{peso(p.revenue)}</div>}
                     <div style={{fontSize:10,color:'var(--text3)'}}>{p.sold} sold</div>
                   </div>
                 </div>
               ))}
             </div>
+            {leastTotalPages>1&&(
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginTop:14}}>
+                <button onClick={()=>setLeastPage(p=>Math.max(1,p-1))} disabled={leastPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:leastPage===1?0.5:1,cursor:leastPage===1?'not-allowed':'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{leastPage} of {leastTotalPages}</div>
+                <button onClick={()=>setLeastPage(p=>Math.min(leastTotalPages,p+1))} disabled={leastPage===leastTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:leastPage===leastTotalPages?0.5:1,cursor:leastPage===leastTotalPages?'not-allowed':'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </>}
@@ -395,7 +440,7 @@ export default function Dashboard() {
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>🎖️ Customer Loyalty Tiers</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:4,display:'flex',alignItems:'center',gap:6}}><Award size={13} style={{color:'var(--purple)'}}/>Customer Loyalty Tiers</div>
             <div style={{fontSize:11,color:'var(--text3)',marginBottom:14}}>Every 1 transaction = 10 loyalty points</div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
@@ -421,7 +466,7 @@ export default function Dashboard() {
           </div>
 
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>🌟 Top Customers by Spending</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><Star size={13} style={{color:'var(--yellow)'}}/>Top Customers by Spending</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {topCustomers.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No customers yet.</div>
               :topCustomers.map((c,i)=>{
@@ -456,7 +501,7 @@ export default function Dashboard() {
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>🔄 Refund Status Breakdown</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><RefreshCw size={13} style={{color:'var(--blue)'}}/>Refund Status Breakdown</div>
             {refStatusData.length===0
               ? <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40}}>No refunds yet.</div>
               : <ResponsiveContainer width="100%" height={200}>
@@ -471,7 +516,7 @@ export default function Dashboard() {
             }
           </div>
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>📋 Recent Refund Requests</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13} style={{color:'var(--accent)'}}/>Recent Refund Requests</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {refunds.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No refunds yet.</div>
               :refunds.slice(0,6).map(r=>(
@@ -482,7 +527,7 @@ export default function Dashboard() {
                   </div>
                   <div style={{textAlign:'right'}}>
                     <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)',fontWeight:600}}>{peso(r.total)}</div>
-                    <span style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:99,background:r.status==='Approved'?'rgba(52,211,153,0.1)':r.status==='Rejected'?'rgba(239,68,68,0.1)':'rgba(234,179,8,0.1)',color:r.status==='Approved'?'var(--accent)':r.status==='Rejected'?'var(--red)':'var(--yellow)'}}>{r.status}</span>
+                    <span style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:99,background:r.status==='Approved'?'rgba(52,211,153,0.1)':r.status==='Rejected'?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',color:r.status==='Approved'?'var(--accent)':r.status==='Rejected'?'var(--red)':'var(--yellow)'}}>{r.status}</span>
                   </div>
                 </div>
               ))}
@@ -525,7 +570,7 @@ export default function Dashboard() {
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14}}>
           <div className="card" style={{padding:20}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>🏆 Top Selling — This Period</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><Trophy size={13} style={{color:'var(--yellow)'}}/>Top Selling — This Period</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {repTop.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No data for this period.</div>
               :repTop.map((p,i)=>(
@@ -544,7 +589,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="card" style={{padding:20,borderTop:'2px solid var(--red)'}}>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>📉 Least Selling — This Period</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><TrendingDown size={13} style={{color:'var(--red)'}}/>Least Selling — This Period</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {repLeast.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No data for this period.</div>
               :repLeast.map((p,i)=>(

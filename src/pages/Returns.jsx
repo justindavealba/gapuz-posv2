@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react'
+import { ClipboardList, Clock, CheckCircle2, RefreshCw, Search, Package, Banknote, Smartphone, Tag, AlertTriangle, Check, X } from 'lucide-react'
 import { useTransactionStore, useAuthStore, useProductStore, useAppStore } from '../store'
 import { useReturnStore } from '../store/useReturnStore'
 import { useToast } from '../utils/toast'
 import { useT, REFUND_REASONS, peso, fmtDate, fmtDateTime } from '../utils/helpers'
 
 const RETURN_METHODS = ['Cash', 'GCash', 'Store Credit']
+const METHOD_ICON = { Cash: Banknote, GCash: Smartphone, 'Store Credit': Tag }
 
 const STEPS = [
   { num: 1, label: 'Look up transaction' },
@@ -19,7 +21,7 @@ const StatusBadge = ({ status, isLight }) => {
     Approved: { bg: '#d1fae5', color: '#047857', border: '#a7f3d0' },
     Rejected: { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
   } : {
-    Pending:  { bg: 'rgba(234,179,8,0.10)',  color: '#eab308', border: 'rgba(234,179,8,0.25)'  },
+    Pending:  { bg: 'rgba(245,158,11,0.10)',  color: '#f59e0b', border: 'rgba(245,158,11,0.25)'  },
     Approved: { bg: 'rgba(52,211,153,0.10)',  color: '#34d399', border: 'rgba(52,211,153,0.25)'  },
     Rejected: { bg: 'rgba(239,68,68,0.10)', color: '#ef4444', border: 'rgba(239,68,68,0.25)' },
   }
@@ -70,10 +72,10 @@ export default function Returns() {
       .filter(r => r.status === 'Approved')
       .reduce((s, r) => s + r.total, 0)
     return [
-      { label: 'Total Returns',    value: returns.length, color: isLight ? '#2563eb' : 'var(--blue)',   icon: '📋' },
-      { label: 'Pending',          value: pending,        color: isLight ? '#d97706' : 'var(--yellow)', icon: '🕒' },
-      { label: 'Approved',         value: approved,       color: isLight ? '#059669' : 'var(--accent)', icon: '✅' },
-      { label: 'Total Refunded',   value: peso(totalRefunded), color: isLight ? '#dc2626' : 'var(--red)', icon: '🔄' },
+      { label: 'Total Returns',    value: returns.length, color: isLight ? '#2563eb' : 'var(--blue)',   icon: ClipboardList },
+      { label: 'Pending',          value: pending,        color: isLight ? '#d97706' : 'var(--yellow)', icon: Clock },
+      { label: 'Approved',         value: approved,       color: isLight ? '#059669' : 'var(--accent)', icon: CheckCircle2 },
+      { label: 'Total Refunded',   value: peso(totalRefunded), color: isLight ? '#dc2626' : 'var(--red)', icon: RefreshCw },
     ]
   }, [returns, isLight])
 
@@ -171,7 +173,7 @@ export default function Returns() {
         if (prod) restockProduct(prod.id, item.returnQty || item.qty || 1)
       })
     }
-    toast('Return approved — items restocked ✓', 'success')
+    toast('Return approved — items restocked', 'success')
   }
 
   const handleReject = (r) => {
@@ -194,8 +196,8 @@ export default function Returns() {
       {/* ── HEADER ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.3px' }}>
-            🔄 Returns
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.3px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RefreshCw size={18} style={{color:'var(--blue)'}}/>Returns
           </div>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>
             Manage product returns · Admin approval required
@@ -207,8 +209,8 @@ export default function Returns() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, flexShrink: 0 }}>
         {stats.map(s => (
           <div key={s.label} style={{ ...card, padding: 18, borderTop: `2px solid ${s.color}`, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 15, right: 15, fontSize: 24, opacity: 0.1, color: s.color }}>
-              {s.icon}
+            <div style={{ position: 'absolute', top: 15, right: 15, opacity: 0.15, color: s.color }}>
+              <s.icon size={24}/>
             </div>
             <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>{s.label}</div>
             <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -237,7 +239,7 @@ export default function Returns() {
                 }}>
                   {step > s.num ? '✓' : s.num}
                 </div>
-                <div style={{ fontSize: 8, color: step >= s.num ? 'var(--text2)' : 'var(--text3)', textAlign: 'center', letterSpacing: '.2px' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: step >= s.num ? 'var(--text2)' : 'var(--text3)', textAlign: 'center', letterSpacing: '.2px' }}>
                   {s.label}
                 </div>
               </div>
@@ -261,7 +263,7 @@ export default function Returns() {
                   {t('orig_txn')} #
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--text3)' }}>🔍</span>
+                  <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }}/>
                   <input
                     className="input-field"
                     style={{ paddingLeft: 34 }}
@@ -338,7 +340,7 @@ export default function Returns() {
                           {item.image && (item.image.startsWith('data:') || item.image.startsWith('http')) ? (
                             <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, opacity: 0.5 }}>{item.image || '📦'}</div>
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>{item.image || <Package size={14}/>}</div>
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -387,16 +389,18 @@ export default function Returns() {
                   {t('refund_method')}
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 6 }}>
-                  {RETURN_METHODS.map(m => (
+                  {RETURN_METHODS.map(m => {
+                    const MIcon = METHOD_ICON[m]
+                    return (
                     <button key={m} onClick={() => setDetails(d => ({ ...d, method: m }))} style={{
-                      padding: '8px 4px', borderRadius: 8, border: '1px solid', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      padding: '8px 4px', borderRadius: 8, border: '1px solid', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       ...(details.method === m
                         ? { borderColor: isLight ? '#059669' : 'var(--accent)', background: isLight ? 'rgba(4,120,87,0.08)' : 'rgba(52,211,153,0.08)', color: isLight ? '#047857' : 'var(--accent)' }
                         : { borderColor: 'var(--border)', background: 'transparent', color: 'var(--text2)' })
                     }}>
-                      {m === 'Cash' ? '💵' : m === 'GCash' ? '📱' : '🏷️'} {m}
+                      <MIcon size={13}/>{m}
                     </button>
-                  ))}
+                  )})}
                 </div>
               </div>
               <div>
@@ -427,7 +431,7 @@ export default function Returns() {
                         {item.image && (item.image.startsWith('data:') || item.image.startsWith('http')) ? (
                           <img src={item.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <span style={{ fontSize: 10 }}>{item.image || '📦'}</span>
+                          <span style={{ fontSize: 10 }}>{item.image || <Package size={11}/>}</span>
                         )}
                       </div>
                       <span>{item.name} ×{returnItems[item.id].qty}</span>
@@ -463,15 +467,15 @@ export default function Returns() {
 
               {/* Cashier note */}
               {!isAdmin && (
-                <div style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: 10, fontSize: 11, color: 'var(--yellow)', lineHeight: 1.6 }}>
-                  ⚠️ Return will be submitted as <strong>Pending</strong>. Admin must approve before items are restocked.
+                <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: 10, fontSize: 11, color: 'var(--yellow)', lineHeight: 1.6, display: 'flex', gap: 6 }}>
+                  <AlertTriangle size={14} style={{flexShrink:0,marginTop:1}}/><span>Return will be submitted as <strong>Pending</strong>. Admin must approve before items are restocked.</span>
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1, padding: 10 }}>← Back</button>
-                <button onClick={handleSubmit} className="btn-primary" style={{ flex: 2, padding: 12, fontSize: 13 }}>
-                  🔄 Submit Return
+                <button onClick={handleSubmit} className="btn-primary" style={{ flex: 2, padding: 12, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                  <RefreshCw size={14}/>Submit Return
                 </button>
               </div>
             </div>
@@ -482,7 +486,7 @@ export default function Returns() {
         <div style={{ ...card, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Table header */}
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>📋 Return History</div>
+            <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}><ClipboardList size={14} style={{color:'var(--accent)'}}/>Return History</div>
             {/* Status filter pills */}
             <div style={{ display: 'flex', gap: 6 }}>
               {['All', 'Pending', 'Approved', 'Rejected'].map(s => (
@@ -509,8 +513,8 @@ export default function Returns() {
               <tbody>
                 {filteredReturns.length === 0 ? (
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text3)' }}>
-                    <div style={{ fontSize: 36, opacity: .2, marginBottom: 8 }}>🔄</div>
-                    No returns found
+                    <RefreshCw size={32} style={{ opacity: .2, marginBottom: 8 }}/>
+                    <div>No returns found</div>
                   </td></tr>
                 ) : filteredReturns.map(r => (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background .1s' }}
@@ -522,8 +526,8 @@ export default function Returns() {
                     <td style={{ padding: '11px 14px', fontSize: 12 }}>{r.customerName}</td>
                     <td style={{ padding: '11px 14px', fontSize: 11, color: 'var(--text2)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reason}</td>
                     <td style={{ padding: '11px 14px' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text2)' }}>
-                        {r.method === 'Cash' ? '💵' : r.method === 'GCash' ? '📱' : '🏷️'} {r.method}
+                      <span style={{ fontSize: 11, color: 'var(--text2)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        {(() => { const MIcon = METHOD_ICON[r.method] || Tag; return <MIcon size={12}/> })()}{r.method}
                       </span>
                     </td>
                     <td style={{ padding: '11px 14px', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>{peso(r.total)}</td>
@@ -531,15 +535,15 @@ export default function Returns() {
                     <td style={{ padding: '11px 14px' }}>
                       {r.status === 'Pending' && isAdmin ? (
                         <div style={{ display: 'flex', gap: 5 }}>
-                          <button onClick={() => handleApprove(r)} style={{ padding: '5px 10px', borderRadius: 7, border: isLight ? '1px solid #6ee7b7' : '1px solid rgba(52,211,153,0.3)', background: isLight ? 'rgba(4,120,87,0.08)' : 'rgba(52,211,153,0.08)', color: isLight ? '#047857' : 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700, transition: 'all .15s' }}
+                          <button onClick={() => handleApprove(r)} style={{ padding: '5px 10px', borderRadius: 7, border: isLight ? '1px solid #6ee7b7' : '1px solid rgba(52,211,153,0.3)', background: isLight ? 'rgba(4,120,87,0.08)' : 'rgba(52,211,153,0.08)', color: isLight ? '#047857' : 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700, transition: 'all .15s', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             onMouseEnter={e => e.currentTarget.style.background = isLight ? 'rgba(4,120,87,0.18)' : 'rgba(52,211,153,0.18)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(52,211,153,0.08)'}>
-                            ✓ {t('approve')}
+                            <Check size={12}/>{t('approve')}
                           </button>
-                          <button onClick={() => handleReject(r)} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: 'var(--red)', cursor: 'pointer', fontSize: 11, fontWeight: 700, transition: 'all .15s' }}
+                          <button onClick={() => handleReject(r)} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: 'var(--red)', cursor: 'pointer', fontSize: 11, fontWeight: 700, transition: 'all .15s', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}>
-                            ✗ {t('reject')}
+                            <X size={12}/>{t('reject')}
                           </button>
                         </div>
                       ) : r.status === 'Pending' && !isAdmin ? (
@@ -556,7 +560,7 @@ export default function Returns() {
 
           {/* Footer note */}
           <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <span style={{ fontSize: 14 }}>⚠️</span>
+            <AlertTriangle size={14} style={{color:'var(--yellow)',flexShrink:0}}/>
             <span style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
               Items are automatically <span style={{ color: isLight ? '#059669' : 'var(--accent)', fontWeight: 600 }}>restocked</span> to inventory only after an Admin approves the return.
             </span>

@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Pencil } from 'lucide-react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useAuthStore, useAppStore, useProductStore, useCustomerStore, useTransactionStore, useRefundStore, useHoldStore } from '../store'
+import { useAuthStore, useAppStore, useProductStore, useCustomerStore, useTransactionStore, useRefundStore, useHoldStore, useCategoryStore } from '../store'
 import { useT, useBreakpoint } from '../utils/helpers'
+import { useToast } from '../utils/toast'
 
 const SidebarIcon = ({ children }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -12,7 +14,7 @@ const SidebarIcon = ({ children }) => (
 const NAV = [
   { section: { en:'', fil:'' }, items:[
     { to:'/pos',       key:'pos',       icon: <SidebarIcon><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></SidebarIcon> },
-    { to:'/dashboard', key:'dashboard', icon: <SidebarIcon><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></SidebarIcon>, adminOnly:true },
+    { to:'/dashboard', key:'dashboard', icon: <SidebarIcon><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></SidebarIcon> },
   ]},
   { section: { en:'Management', fil:'Pamamahala' }, items:[
     { to:'/products',  key:'products',  icon: <SidebarIcon><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></SidebarIcon>, adminOnly:true },
@@ -25,27 +27,69 @@ const NAV = [
 ]
 
 export default function Layout() {
-  const { user, role, logout }                          = useAuthStore()
+  const { user, role, logout, updateProfile }           = useAuthStore()
   const { theme, language, toggleTheme }                = useAppStore()
   const navigate  = useNavigate()
   const isLight   = theme === 'light'
   const location  = useLocation()
   const t         = useT()
-  const [time, setTime] = useState(new Date())
+  const toast     = useToast()
   const { isMobile } = useBreakpoint()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [profileModal, setProfileModal] = useState(false)
+  const [profileForm, setProfileForm] = useState({ name:'', currentPassword:'', password:'', confirmPassword:'' })
+  const [profileSaving, setProfileSaving] = useState(false)
+  const profileRef = useRef(null)
 
-  useEffect(()=>{ const i=setInterval(()=>setTime(new Date()),1000); return()=>clearInterval(i) },[])
   useEffect(()=>{ setMobileNavOpen(false) },[location.pathname])
+  useEffect(()=>{
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  },[])
+  useEffect(()=>{
+    const onClick = (e) => { if(profileRef.current && !profileRef.current.contains(e.target)) setProfileMenuOpen(false) }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  },[])
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen()
+    else document.exitFullscreen()
+  }
+
+  const openProfileModal = () => {
+    setProfileForm({ name: userName, currentPassword:'', password:'', confirmPassword:'' })
+    setProfileModal(true)
+    setProfileMenuOpen(false)
+  }
+
+  const handleProfileSave = async () => {
+    const { currentPassword, password, confirmPassword } = profileForm
+    if (currentPassword || password || confirmPassword) {
+      if (!currentPassword) return toast('Please enter your current password', 'error')
+      if (!password) return toast('Please enter a new password', 'error')
+      if (password.length < 6) return toast('New password must be at least 6 characters', 'error')
+      if (password !== confirmPassword) return toast('New passwords do not match', 'error')
+    }
+    setProfileSaving(true)
+    const { error } = await updateProfile(profileForm)
+    setProfileSaving(false)
+    if (error) return toast(error.message||'Update failed','error')
+    toast(t('profile_updated'),'success')
+    setProfileModal(false)
+  }
   useEffect(()=>{
     useProductStore.getState().fetchProducts()
     useCustomerStore.getState().fetchCustomers()
     useTransactionStore.getState().fetchTransactions()
     useRefundStore.getState().fetchRefunds()
     useHoldStore.getState().fetchHolds()
+    useCategoryStore.getState().fetchCategories()
   },[])
 
-  const handleLogout = async () => { await logout(); navigate('/login') }
   const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
   const initials = userName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
   const sW = isMobile ? '240px' : '220px'
@@ -143,57 +187,6 @@ export default function Layout() {
             )
           })}
         </nav>
-
-        {/* Footer */}
-        <div style={{ padding:'12px 8px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
-          {/* Theme toggle */}
-          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
-            <button onClick={toggleTheme} aria-label="Toggle theme" style={{
-              width:30, height:30, borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg3)',
-              color:'var(--text2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text2)'}}>
-              {theme==='dark' ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
-              )}
-            </button>
-          </div>
-
-          {/* User */}
-          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--border)', overflow:'hidden' }}>
-            <div style={{ width:34, height:34, borderRadius:9, background:'linear-gradient(140deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'var(--accent-dark)', flexShrink:0, boxShadow:'0 2px 6px rgba(52,211,153,0.3)' }}>
-              {initials}
-            </div>
-            <div style={{ overflow:'hidden', flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{userName}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:10.5, fontWeight:600, color: role==='admin' ? 'var(--yellow)' : 'var(--text2)', marginTop:2 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  {role==='admin'
-                    ? <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7Z"/>
-                    : <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>
-                  }
-                </svg>
-                {role==='admin' ? 'Admin' : 'Cashier'}
-              </div>
-            </div>
-          </div>
-
-          <button onClick={handleLogout} style={{
-              width:'100%', marginTop:8, padding:'10px 14px', borderRadius:10, display:'flex', alignItems:'center',
-              justifyContent:'center', gap:8, border:'1px solid var(--border2)', background:'var(--bg3)',
-              color:'var(--text2)', cursor:'pointer', fontSize:12.5, fontWeight:700, transition:'all .15s',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(239,68,68,0.1)';e.currentTarget.style.borderColor='var(--red)';e.currentTarget.style.color='var(--red)'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text2)'}}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              {t('logout')}
-          </button>
-        </div>
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────── */}
@@ -224,20 +217,127 @@ export default function Layout() {
               <span className="badge badge-accent" style={{ fontSize:10 }}>Admin</span>
             )}
           </div>
-          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'var(--text2)', flexShrink:0 }}>
-            {time.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+          <button onClick={toggleFullscreen} aria-label="Toggle fullscreen" style={{
+            width:30, height:30, flexShrink:0, borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg3)',
+            color:'var(--text2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text2)'}}>
+            {isFullscreen ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"/></svg>
+            )}
+          </button>
+
+          {/* Profile menu */}
+          <div ref={profileRef} style={{ position:'relative', flexShrink:0 }}>
+            <button onClick={()=>setProfileMenuOpen(o=>!o)} aria-label="Account menu" style={{
+              display:'flex', alignItems:'center', gap:9, padding:'5px 10px 5px 5px', borderRadius:22,
+              border: profileMenuOpen ? '1px solid var(--border2)' : '1px solid transparent',
+              background: profileMenuOpen ? 'var(--bg3)' : 'transparent',
+              boxShadow: profileMenuOpen ? '0 4px 14px rgba(0,0,0,0.18)' : 'none',
+              color:'var(--text2)', cursor:'pointer', transition:'all .15s',
+            }}>
+              <div style={{ width:30, height:30, borderRadius:9, background:'linear-gradient(140deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12.5, fontWeight:800, color:'var(--accent-dark)', flexShrink:0 }}>
+                {initials}
+              </div>
+              {!isMobile && <span style={{ fontSize:14.5, fontWeight:600, color:'var(--text)', maxWidth:110, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{userName}</span>}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: profileMenuOpen?'rotate(180deg)':'none', transition:'transform .15s', flexShrink:0 }}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+
+            {profileMenuOpen && (
+              <div className="card animate-scale-in" style={{
+                position:'absolute', top:'calc(100% + 8px)', right:0, width:225, padding:10, zIndex:150,
+                border:'1px solid var(--border2)', boxShadow:'0 12px 32px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.16)',
+              }}>
+                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8, padding:'10px 12px', borderBottom:'1px solid var(--border)', marginBottom:8 }}>
+                  <div style={{ overflow:'hidden' }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{userName}</div>
+                    <div style={{ fontSize:12.5, color:'var(--text2)', marginTop:2 }}>{role==='admin' ? 'Admin' : 'Cashier'}</div>
+                  </div>
+                  <button onClick={toggleTheme} aria-label="Toggle theme" style={{
+                    width:28, height:28, borderRadius:8, flexShrink:0, border:'1px solid var(--border2)', background:'var(--bg3)',
+                    color:'var(--text2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s',
+                  }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text2)'}}>
+                    {theme==='dark' ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+                    )}
+                  </button>
+                </div>
+                <button onClick={openProfileModal} style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:8,
+                  border:'none', background:'transparent', color:'var(--text)', cursor:'pointer', fontSize:14.5, fontWeight:500, textAlign:'left',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--bg3)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                  {t('edit_profile')}
+                </button>
+                <button onClick={async ()=>{ setProfileMenuOpen(false); await logout(); navigate('/login') }} style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:8,
+                  border:'none', background:'transparent', color:'var(--red)', cursor:'pointer', fontSize:14.5, fontWeight:500, textAlign:'left',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(239,68,68,0.1)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  {t('logout')}
+                </button>
+              </div>
+            )}
           </div>
-          {!isMobile && (
-            <div style={{ fontSize:12, color:'var(--text2)', flexShrink:0 }}>
-              {time.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'})}
-            </div>
-          )}
         </header>
 
         <div style={{ flex:1, overflow:'hidden' }}>
           <Outlet/>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {profileModal && (
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&setProfileModal(false)}>
+          <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:28}}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:20,display:'flex',alignItems:'center',gap:6}}><Pencil size={14} style={{color:'var(--blue)'}}/>{t('edit_profile')}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={{fontSize:10,color:'var(--text3)',display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('full_name')}</label>
+                <input className="input-field" type="text" value={profileForm.name} onChange={e=>setProfileForm(f=>({...f,name:e.target.value}))} placeholder="Juan dela Cruz"/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:'var(--text3)',display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('current_password')}</label>
+                <input className="input-field" type="password" value={profileForm.currentPassword} onChange={e=>setProfileForm(f=>({...f,currentPassword:e.target.value}))} placeholder="••••••••"/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:'var(--text3)',display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('new_password')}</label>
+                <input className="input-field" type="password" value={profileForm.password} onChange={e=>setProfileForm(f=>({...f,password:e.target.value}))} placeholder="••••••••"/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:'var(--text3)',display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'.5px'}}>{t('confirm_new_password')}</label>
+                <input className="input-field" type="password" value={profileForm.confirmPassword} onChange={e=>setProfileForm(f=>({...f,confirmPassword:e.target.value}))} placeholder="••••••••"/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+              <button onClick={()=>setProfileModal(false)} disabled={profileSaving} className="btn-secondary">{t('cancel')}</button>
+              <button onClick={handleProfileSave} disabled={profileSaving} className="btn-primary" style={{display:'flex',alignItems:'center',gap:8}}>
+                {profileSaving && (
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                    <path d="M21 12a9 9 0 1 1-9-9"/>
+                  </svg>
+                )}
+                {profileSaving ? 'Saving...' : t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

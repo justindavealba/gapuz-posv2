@@ -10,6 +10,14 @@ export const translations = {
     logout:     'Logout',
     returns:    'Returns',
 
+    // Profile menu
+    edit_profile:    'Change Password',
+    my_account:      'My Account',
+    profile_updated: 'Profile updated',
+    current_password:     'Current Password',
+    new_password:         'New Password (optional)',
+    confirm_new_password: 'Confirm New Password',
+
     // Login
     welcome:    'Welcome Back',
     signin:     'Sign In',
@@ -39,7 +47,7 @@ export const translations = {
     clear:            'Clear',
     out_of_stock:     'Out of Stock',
     low_stock:        'Low Stock',
-    added_to_cart:    'added to cart ✓',
+    added_to_cart:    'added to cart',
     payment_success:  'Payment Successful!',
     print:            'Print',
     close:            'Close',
@@ -85,10 +93,10 @@ export const translations = {
     inventory_value:'Inventory Value',
     total_products: 'Total Products',
     confirm_delete: 'Delete this product?',
-    product_added:  'Product added ✓',
-    product_updated:'Product updated ✓',
+    product_added:  'Product added',
+    product_updated:'Product updated',
     product_deleted:'Product deleted',
-    restocked:      'Restocked ✓',
+    restocked:      'Restocked',
 
     // Reports
     today:          'Today',
@@ -115,8 +123,8 @@ export const translations = {
     tier:           'Tier',
     purchase_history:'Purchase History',
     no_purchases:   'No purchases yet',
-    customer_added: 'Customer added ✓',
-    customer_updated:'Customer updated ✓',
+    customer_added: 'Customer added',
+    customer_updated:'Customer updated',
     confirm_delete_cust: 'Delete this customer?',
 
     // Refunds
@@ -136,7 +144,7 @@ export const translations = {
     rejected:       'Rejected',
     refund_total:   'Refund Total',
     txn_not_found:  'Transaction not found',
-    refund_processed:'Refund processed ✓',
+    refund_processed:'Refund processed',
 
     // Common
     status:         'Status',
@@ -172,6 +180,14 @@ export const translations = {
     logout:     'Mag-logout',
     returns:    'Mga Return',
 
+    // Profile menu
+    edit_profile:    'Palitan ang Password',
+    my_account:      'Aking Account',
+    profile_updated: 'Na-update ang profile',
+    current_password:     'Kasalukuyang Password',
+    new_password:         'Bagong Password (opsyonal)',
+    confirm_new_password: 'Kumpirmahin ang Bagong Password',
+
     // Login
     welcome:    'Maligayang Pagbabalik',
     signin:     'Mag-sign In',
@@ -201,7 +217,7 @@ export const translations = {
     clear:            'Burahin',
     out_of_stock:     'Wala na sa Stock',
     low_stock:        'Mababa ang Stock',
-    added_to_cart:    'naidagdag sa cart ✓',
+    added_to_cart:    'naidagdag sa cart',
     payment_success:  'Matagumpay ang Bayad!',
     print:            'I-print',
     close:            'Isara',
@@ -247,10 +263,10 @@ export const translations = {
     inventory_value:'Halaga ng Imbentaryo',
     total_products: 'Kabuuang Produkto',
     confirm_delete: 'Burahin ang produktong ito?',
-    product_added:  'Naidagdag ang produkto ✓',
-    product_updated:'Na-update ang produkto ✓',
+    product_added:  'Naidagdag ang produkto',
+    product_updated:'Na-update ang produkto',
     product_deleted:'Nabura ang produkto',
-    restocked:      'Na-restock ✓',
+    restocked:      'Na-restock',
 
     // Reports
     today:          'Ngayon',
@@ -277,8 +293,8 @@ export const translations = {
     tier:           'Tier',
     purchase_history:'Kasaysayan ng Pagbili',
     no_purchases:   'Wala pang binili',
-    customer_added: 'Naidagdag ang customer ✓',
-    customer_updated:'Na-update ang customer ✓',
+    customer_added: 'Naidagdag ang customer',
+    customer_updated:'Na-update ang customer',
     confirm_delete_cust: 'Burahin ang customer na ito?',
 
     // Refunds
@@ -298,7 +314,7 @@ export const translations = {
     rejected:       'Tinanggihan',
     refund_total:   'Kabuuang Refund',
     txn_not_found:  'Hindi nahanap ang transaksyon',
-    refund_processed:'Na-proseso ang refund ✓',
+    refund_processed:'Na-proseso ang refund',
 
     // Common
     status:         'Status',

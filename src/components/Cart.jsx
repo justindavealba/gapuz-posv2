@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { Banknote, Smartphone, CreditCard, Zap, ShoppingCart, Package, AlertTriangle, Mail, Printer, Check, PauseCircle } from 'lucide-react'
 import { useCartStore, useAuthStore, useTransactionStore, useProductStore, useCustomerStore } from '../store'
+import { supabase } from '../lib/supabaseClient'
 import { peso, fmtTxnId, useT, useBreakpoint } from '../utils/helpers'
 import { useToast } from '../utils/toast'
 import Receipt from './Receipt'
@@ -92,9 +93,14 @@ export default function Cart({ products, customers, onHold }) {
     setChangeAcked(false); setLastTxn(null)
   }
 
-  const sendEmailReceipt = () => {
-    if(!customerEmail) return
-    toast('Email receipts coming soon!','info')
+  const [sendingReceipt, setSendingReceipt] = useState(false)
+  const sendEmailReceipt = async () => {
+    if(!customerEmail || sendingReceipt) return
+    setSendingReceipt(true)
+    const { error } = await supabase.functions.invoke('send-receipt', { body: { email: customerEmail, txn: lastTxn } })
+    setSendingReceipt(false)
+    if(error) toast('Failed to send receipt email','error')
+    else toast(`Receipt sent to ${customerEmail}`,'success')
   }
   const border = '1px solid var(--border)'
 
@@ -347,7 +353,7 @@ export default function Cart({ products, customers, onHold }) {
                         {emailReceipt&&(
                           <div style={{display:'flex',gap:6,marginTop:10}}>
                             <input type="email" className="input-field" style={{fontSize:12,padding:'8px 10px'}} placeholder="customer@gmail.com" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)}/>
-                            <button onClick={sendEmailReceipt} disabled={!customerEmail} className="btn-secondary" style={{padding:'8px 14px',fontSize:12,opacity:customerEmail?1:.5,cursor:customerEmail?'pointer':'not-allowed'}}>Send</button>
+                            <button onClick={sendEmailReceipt} disabled={!customerEmail||sendingReceipt} className="btn-secondary" style={{padding:'8px 14px',fontSize:12,opacity:customerEmail&&!sendingReceipt?1:.5,cursor:customerEmail&&!sendingReceipt?'pointer':'not-allowed'}}>{sendingReceipt?'Sending…':'Send'}</button>
                           </div>
                         )}
                       </div>

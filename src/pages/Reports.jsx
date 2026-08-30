@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTransactionStore, useProductStore, useCustomerStore, useRefundStore } from '../store'
 import { useT, peso, pesoCompact, getTier } from '../utils/helpers'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
@@ -39,6 +39,16 @@ export default function Reports(){
   const t            = useT()
   const [activeTab,  setActiveTab]  = useState('sales')
   const [period,     setPeriod]     = useState('Today')
+  const [txPage,     setTxPage]     = useState(1)
+  const TX_PAGE_SIZE = 7
+  const [newStockPage, setNewStockPage] = useState(1)
+  const NEW_STOCK_PAGE_SIZE = 7
+  const [lossProdPage, setLossProdPage] = useState(1)
+  const LOSS_PROD_PAGE_SIZE = 7
+  const [lowMarginPage, setLowMarginPage] = useState(1)
+  const LOW_MARGIN_PAGE_SIZE = 7
+  const [refPage,    setRefPage]    = useState(1)
+  const REF_PAGE_SIZE = 7
 
   const filtered = useMemo(()=>{
     const now = new Date()
@@ -49,6 +59,10 @@ export default function Reports(){
     else{start.setMonth(0,1);start.setHours(0,0,0,0)}
     return transactions.filter(tx=>new Date(tx.createdAt)>=start)
   },[transactions,period])
+  const txTotalPages = Math.max(1, Math.ceil(filtered.length/TX_PAGE_SIZE))
+  useEffect(()=>{ setTxPage(1) }, [period, filtered.length])
+  useEffect(()=>{ if(txPage>txTotalPages) setTxPage(txTotalPages) }, [txTotalPages])
+  const txPageItems = filtered.slice((txPage-1)*TX_PAGE_SIZE, txPage*TX_PAGE_SIZE)
 
   // ── SALES ────────────────────────────────────────────────
   const salesRev  = filtered.reduce((s,t)=>s+t.total,0)
@@ -71,6 +85,10 @@ export default function Reports(){
   const now       = new Date()
   const oldStock  = products.filter(p=>{ const added=p.createdAt?new Date(p.createdAt):null; const lastSold=p.lastSoldAt?new Date(p.lastSoldAt):null; const daysSinceAdded=added?Math.floor((now-added)/(1000*60*60*24)):0; const daysSinceLastSold=lastSold?Math.floor((now-lastSold)/(1000*60*60*24)):999; return daysSinceAdded>90&&daysSinceLastSold>90 })
   const newStock  = products.filter(p=>{ const added=p.createdAt?new Date(p.createdAt):null; const days=added?Math.floor((now-added)/(1000*60*60*24)):999; return days<=30 })
+  const newStockTotalPages = Math.max(1, Math.ceil(newStock.length/NEW_STOCK_PAGE_SIZE))
+  useEffect(()=>{ setNewStockPage(1) }, [products.length])
+  useEffect(()=>{ if(newStockPage>newStockTotalPages) setNewStockPage(newStockTotalPages) }, [newStockTotalPages])
+  const newStockPageItems = newStock.slice((newStockPage-1)*NEW_STOCK_PAGE_SIZE, newStockPage*NEW_STOCK_PAGE_SIZE)
   const catData   = useMemo(()=>{ const map={}; products.forEach(p=>{ map[p.category]=(map[p.category]||0)+1 }); return Object.entries(map).map(([name,value])=>({name,value})) },[products])
 
   // ── LOSS ─────────────────────────────────────────────────
@@ -78,6 +96,12 @@ export default function Reports(){
   const totalLoss = lossProds.reduce((s,p)=>s+((p.costPrice-p.price)*p.sold),0)
   const soldAtLoss= useMemo(()=>{ const map={}; filtered.forEach(tx=>(tx.items||[]).forEach(i=>{ const prod=products.find(p=>p.name===i.name); if(prod&&prod.costPrice&&prod.price<prod.costPrice){ if(!map[i.name]) map[i.name]={name:i.name,sold:0,lossPerUnit:prod.costPrice-prod.price,totalLoss:0}; map[i.name].sold+=i.qty; map[i.name].totalLoss+=(prod.costPrice-prod.price)*i.qty } })); return Object.values(map).sort((a,b)=>b.totalLoss-a.totalLoss) },[filtered,products])
   const lowMargin = products.filter(p=>p.costPrice&&p.category!=='Services').map(p=>({...p,margin:Math.round(((p.price-p.costPrice)/p.price)*100)})).filter(p=>p.margin>=0&&p.margin<=15).sort((a,b)=>a.margin-b.margin)
+  const lossProdTotalPages = Math.max(1, Math.ceil(lossProds.length/LOSS_PROD_PAGE_SIZE))
+  useEffect(()=>{ if(lossProdPage>lossProdTotalPages) setLossProdPage(lossProdTotalPages) }, [lossProdTotalPages])
+  const lossProdPageItems = lossProds.slice((lossProdPage-1)*LOSS_PROD_PAGE_SIZE, lossProdPage*LOSS_PROD_PAGE_SIZE)
+  const lowMarginTotalPages = Math.max(1, Math.ceil(lowMargin.length/LOW_MARGIN_PAGE_SIZE))
+  useEffect(()=>{ if(lowMarginPage>lowMarginTotalPages) setLowMarginPage(lowMarginTotalPages) }, [lowMarginTotalPages])
+  const lowMarginPageItems = lowMargin.slice((lowMarginPage-1)*LOW_MARGIN_PAGE_SIZE, lowMarginPage*LOW_MARGIN_PAGE_SIZE)
 
   // ── CUSTOMER ──────────────────────────────────────────────
   const topCusts  = useMemo(()=>[...customers].sort((a,b)=>b.totalSpent-a.totalSpent).slice(0,8),[customers])
@@ -97,6 +121,10 @@ export default function Reports(){
     else{start.setMonth(0,1);start.setHours(0,0,0,0)}
     return refunds.filter(r=>new Date(r.createdAt||r.date)>=start)
   },[refunds,period])
+  const refTotalPages = Math.max(1, Math.ceil(refFiltered.length/REF_PAGE_SIZE))
+  useEffect(()=>{ setRefPage(1) }, [period, refFiltered.length])
+  useEffect(()=>{ if(refPage>refTotalPages) setRefPage(refTotalPages) }, [refTotalPages])
+  const refPageItems = refFiltered.slice((refPage-1)*REF_PAGE_SIZE, refPage*REF_PAGE_SIZE)
   const refApproved= refFiltered.filter(r=>r.status==='Approved')
   const refTotal   = refApproved.reduce((s,r)=>s+r.total,0)
   const refStatusData=[
@@ -231,7 +259,7 @@ export default function Reports(){
               <thead><tr>{['TXN #','Date & Time','Customer','Items','Payment','Subtotal','VAT','Total'].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>No transactions for this period.</td></tr>
-                :filtered.map(tx=>(
+                :txPageItems.map(tx=>(
                   <tr key={tx.id}>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--accent)'}}>#{String(tx.id).padStart(4,'0')}</td>
                     <td style={{fontSize:11,color:'var(--text3)'}}>{new Date(tx.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
@@ -246,6 +274,17 @@ export default function Reports(){
               </tbody>
             </table>
           </div>
+          {txTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,paddingTop:12}}>
+              <button onClick={()=>setTxPage(p=>Math.max(1,p-1))} disabled={txPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:txPage===1?0.5:1,cursor:txPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{txPage} of {txTotalPages}</div>
+              <button onClick={()=>setTxPage(p=>Math.min(txTotalPages,p+1))} disabled={txPage===txTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:txPage===txTotalPages?0.5:1,cursor:txPage===txTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
       </>}
 
@@ -305,7 +344,7 @@ export default function Reports(){
           <div className="card" style={{padding:20,borderTop:'2px solid var(--accent)'}}>
             <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><PackagePlus size={13} style={{color:'var(--green)'}}/>New Stock</div>
             {newStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>No new items.</div>
-            :newStock.map(p=>{
+            :newStockPageItems.map(p=>{
               const added=p.createdAt?new Date(p.createdAt):null
               const daysAgo=added?Math.floor((now-added)/(1000*60*60*24)):0
               return(
@@ -315,6 +354,17 @@ export default function Reports(){
                 </div>
               )
             })}
+            {newStockTotalPages>1&&(
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,paddingTop:12}}>
+                <button onClick={()=>setNewStockPage(p=>Math.max(1,p-1))} disabled={newStockPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:newStockPage===1?0.5:1,cursor:newStockPage===1?'not-allowed':'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{newStockPage} of {newStockTotalPages}</div>
+                <button onClick={()=>setNewStockPage(p=>Math.min(newStockTotalPages,p+1))} disabled={newStockPage===newStockTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:newStockPage===newStockTotalPages?0.5:1,cursor:newStockPage===newStockTotalPages?'not-allowed':'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </>}
@@ -334,7 +384,7 @@ export default function Reports(){
             <table>
               <thead><tr>{['Product','Category','Cost Price','Selling Price','Loss/Unit','Units Sold','Total Loss'].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {lossProds.map(p=>(
+                {lossProdPageItems.map(p=>(
                   <tr key={p.id}>
                     <td style={{fontSize:12,fontWeight:500}}>{p.name}</td>
                     <td><span className="badge badge-accent" style={{fontSize:10}}>{p.category}</span></td>
@@ -348,6 +398,17 @@ export default function Reports(){
               </tbody>
             </table>
           </div>}
+          {lossProdTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,paddingTop:12}}>
+              <button onClick={()=>setLossProdPage(p=>Math.max(1,p-1))} disabled={lossProdPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:lossProdPage===1?0.5:1,cursor:lossProdPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{lossProdPage} of {lossProdTotalPages}</div>
+              <button onClick={()=>setLossProdPage(p=>Math.min(lossProdTotalPages,p+1))} disabled={lossProdPage===lossProdTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:lossProdPage===lossProdTotalPages?0.5:1,cursor:lossProdPage===lossProdTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
         <div className="card" style={{padding:20,borderTop:'2px solid var(--yellow)'}}>
           <div style={{fontWeight:600,fontSize:13,marginBottom:4,display:'flex',alignItems:'center',gap:6}}><AlertTriangle size={13} style={{color:'var(--yellow)'}}/>Low Margin Products</div>
@@ -357,7 +418,7 @@ export default function Reports(){
             <table>
               <thead><tr>{['Product','Category','Cost Price','Selling Price','Margin %','Stock'].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {lowMargin.map(p=>(
+                {lowMarginPageItems.map(p=>(
                   <tr key={p.id}>
                     <td style={{fontSize:12,fontWeight:500}}>{p.name}</td>
                     <td><span className="badge badge-accent" style={{fontSize:10}}>{p.category}</span></td>
@@ -370,6 +431,17 @@ export default function Reports(){
               </tbody>
             </table>
           </div>}
+          {lowMarginTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,paddingTop:12}}>
+              <button onClick={()=>setLowMarginPage(p=>Math.max(1,p-1))} disabled={lowMarginPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:lowMarginPage===1?0.5:1,cursor:lowMarginPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{lowMarginPage} of {lowMarginTotalPages}</div>
+              <button onClick={()=>setLowMarginPage(p=>Math.min(lowMarginTotalPages,p+1))} disabled={lowMarginPage===lowMarginTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:lowMarginPage===lowMarginTotalPages?0.5:1,cursor:lowMarginPage===lowMarginTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
         {soldAtLoss.length>0&&(
           <div className="card" style={{padding:20,borderTop:'2px solid var(--red)'}}>
@@ -492,7 +564,7 @@ export default function Reports(){
               <thead><tr>{['Refund #','TXN #','Customer','Reason','Method','Amount','Status'].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {refFiltered.length===0?<tr><td colSpan={7} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>No refunds for this period.</td></tr>
-                :refFiltered.map(r=>(
+                :refPageItems.map(r=>(
                   <tr key={r.id}>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--accent)'}}>#{String(r.id).padStart(4,'0')}</td>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--text3)'}}>#{String(r.transactionId||'—').padStart(4,'0')}</td>
@@ -506,6 +578,17 @@ export default function Reports(){
               </tbody>
             </table>
           </div>
+          {refTotalPages>1&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,paddingTop:12}}>
+              <button onClick={()=>setRefPage(p=>Math.max(1,p-1))} disabled={refPage===1} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:refPage===1?0.5:1,cursor:refPage===1?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div style={{fontSize:11.5,color:'var(--text3)',fontWeight:600}}>{refPage} of {refTotalPages}</div>
+              <button onClick={()=>setRefPage(p=>Math.min(refTotalPages,p+1))} disabled={refPage===refTotalPages} className="btn-secondary" style={{padding:'6px 10px',display:'flex',alignItems:'center',opacity:refPage===refTotalPages?0.5:1,cursor:refPage===refTotalPages?'not-allowed':'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
         </div>
       </>}
     </div>

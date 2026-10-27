@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus, Pencil, X, User, Mail, Lock, Eye, EyeOff, UserX, UserCheck } from 'lucide-react'
+import { UserPlus, Pencil, X, User, Mail, Lock, Eye, EyeOff, UserX, UserCheck, AlertTriangle } from 'lucide-react'
 import { useStaffStore } from '../store'
 import { useToast } from '../utils/toast'
 import { useT, fmtDate } from '../utils/helpers'
@@ -51,12 +51,22 @@ function PasswordField({ value, onChange, placeholder, onEnter }) {
   )
 }
 
+function Spinner({ size=14, color='currentColor' }) {
+  return (
+    <svg className="animate-spin" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round">
+      <path d="M21 12a9 9 0 1 1-9-9"/>
+    </svg>
+  )
+}
+
 export default function Staff() {
   const { staff, loading, addCashier, updateStaff, toggleStaffStatus } = useStaffStore()
-  const [modal,    setModal]    = useState(null) // 'add' | 'edit' | null
-  const [form,     setForm]     = useState(EMPTY)
-  const [selected, setSelected] = useState(null)
-  const [saving,   setSaving]   = useState(false)
+  const [modal,          setModal]          = useState(null) // 'add' | 'edit' | null
+  const [form,           setForm]           = useState(EMPTY)
+  const [selected,       setSelected]       = useState(null)
+  const [saving,         setSaving]         = useState(false)
+  const [statusConfirm,  setStatusConfirm]  = useState(null) // staff member pending suspend/reactivate confirmation
+  const [togglingId,     setTogglingId]     = useState(null) // id currently being suspended/reactivated
   const toast = useToast()
   const t     = useT()
 
@@ -82,13 +92,15 @@ export default function Staff() {
     closeModal()
   }
 
-  const handleToggleStatus = async (s) => {
-    const makeActive = s.active === false
-    if (!makeActive && !window.confirm(t('confirm_suspend'))) return
+  const runToggle = async (s, makeActive) => {
+    setTogglingId(s.id)
     const { error } = await toggleStaffStatus({ id: s.id, active: makeActive })
+    setTogglingId(null)
     if (error) return toast(error.message || 'Could not update account status', 'error')
     toast(makeActive ? t('staff_reactivated') : t('staff_suspended'), 'success')
   }
+
+  const handleToggleStatus = (s) => setStatusConfirm(s)
 
   return (
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column',padding:20,gap:16}}>
@@ -106,9 +118,7 @@ export default function Staff() {
             <tbody>
               {loading ? <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M21 12a9 9 0 1 1-9-9"/>
-                  </svg>
+                  <Spinner size={18} color="var(--accent)"/>
                   {t('loading')}
                 </div>
               </td></tr>
@@ -132,8 +142,9 @@ export default function Staff() {
                         <Pencil size={11}/>{t('edit')}
                       </button>
                       {s.role==='cashier' && (
-                        <button onClick={()=>handleToggleStatus(s)} className={isSuspended?'btn-success':'btn-danger'} style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4}}>
-                          {isSuspended ? <UserCheck size={11}/> : <UserX size={11}/>}{isSuspended?t('reactivate'):t('suspend')}
+                        <button onClick={()=>handleToggleStatus(s)} disabled={togglingId===s.id} className={isSuspended?'btn-success':'btn-danger'} style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4,opacity:togglingId===s.id?0.7:1}}>
+                          {togglingId===s.id ? <Spinner size={11}/> : isSuspended ? <UserCheck size={11}/> : <UserX size={11}/>}
+                          {isSuspended?t('reactivate'):t('suspend')}
                         </button>
                       )}
                     </div>
@@ -199,13 +210,43 @@ export default function Staff() {
             {/* Footer */}
             <div style={{display:'flex',gap:10,padding:'16px 26px',borderTop:'1px solid var(--border)',justifyContent:'flex-end'}}>
               <button onClick={closeModal} disabled={saving} className="btn-secondary">{t('cancel')}</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
+              <button onClick={handleSave} disabled={saving} className="btn-primary" style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                {saving && <Spinner size={13}/>}
                 {saving ? 'Saving...' : (isAdd ? t('create_account') : t('save_changes'))}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Suspend / Reactivate confirmation */}
+      {statusConfirm && (() => {
+        const willReactivate = statusConfirm.active === false
+        const color = willReactivate ? 'var(--green)' : 'var(--red)'
+        const actionLabel = willReactivate ? t('reactivate') : t('suspend')
+        const busy = togglingId === statusConfirm.id
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)'}} onClick={e=>e.target===e.currentTarget&&!busy&&setStatusConfirm(null)}>
+            <div className="card animate-scale-in" style={{width:'min(360px,92vw)',padding:28,textAlign:'center'}}>
+              <div style={{width:44,height:44,borderRadius:'50%',background:willReactivate?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',color}}>
+                {willReactivate ? <UserCheck size={22}/> : <AlertTriangle size={22}/>}
+              </div>
+              <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>{actionLabel} {statusConfirm.name}?</div>
+              <div style={{fontSize:12.5,color:'var(--text2)',lineHeight:1.5}}>
+                {willReactivate ? `They'll be able to log in again once reactivated.` : t('confirm_suspend')}
+              </div>
+              <div style={{display:'flex',gap:10,marginTop:20}}>
+                <button onClick={()=>setStatusConfirm(null)} disabled={busy} className="btn-secondary" style={{flex:1}}>{t('cancel')}</button>
+                <button onClick={async ()=>{ await runToggle(statusConfirm, willReactivate); setStatusConfirm(null) }}
+                        disabled={busy} className="btn-primary"
+                        style={{flex:1,background:color,borderColor:color,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                  {busy && <Spinner size={13}/>}{actionLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

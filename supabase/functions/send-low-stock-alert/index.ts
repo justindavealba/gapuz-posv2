@@ -22,22 +22,31 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
 
+const LOGO_URL = 'https://gapuzpos.vercel.app/logo.png'
+const APP_URL = 'https://gapuzpos.vercel.app'
+
 function alertHtml(product: any) {
   return `
-  <div style="font-family:Arial,sans-serif;max-width:420px;margin:0 auto;padding:20px;color:#111">
-    <div style="text-align:center;border-bottom:1px dashed #ccc;padding-bottom:10px;margin-bottom:16px">
-      <div style="font-size:16px;font-weight:700">GAPUZ COMPUTER</div>
-      <div style="font-weight:700">SERVICES & ACCESSORIES</div>
+  <div style="max-width:420px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);font-family:Arial,sans-serif">
+    <div style="background:#059669;padding:22px 20px;text-align:center">
+      <img src="${LOGO_URL}" width="44" height="44" alt="Gapuz" style="border-radius:50%;display:block;margin:0 auto 8px;border:2px solid rgba(255,255,255,0.4)"/>
+      <div style="color:#ffffff;font-size:14px;font-weight:800;letter-spacing:.3px">GAPUZ COMPUTER</div>
+      <div style="color:rgba(255,255,255,0.85);font-size:10px;font-weight:700;letter-spacing:.5px;margin-top:2px">SERVICES & ACCESSORIES</div>
     </div>
-    <div style="text-align:center;font-size:28px;margin-bottom:8px">⚠️</div>
-    <div style="text-align:center;font-size:16px;font-weight:700;color:#b91c1c;margin-bottom:12px">Product Out of Stock</div>
-    <table style="width:100%;font-size:13px;border-collapse:collapse">
-      <tr><td style="padding:4px 0;color:#555">Product</td><td style="padding:4px 0;text-align:right;font-weight:700">${product.name}</td></tr>
-      ${product.category ? `<tr><td style="padding:4px 0;color:#555">Category</td><td style="padding:4px 0;text-align:right">${product.category}</td></tr>` : ''}
-      ${product.barcode ? `<tr><td style="padding:4px 0;color:#555">Barcode</td><td style="padding:4px 0;text-align:right">${product.barcode}</td></tr>` : ''}
-    </table>
-    <div style="text-align:center;font-size:11px;color:#888;border-top:1px dashed #ccc;padding-top:10px;margin-top:16px">
-      Restock this item from the Products page before it affects sales.
+
+    <div style="padding:26px 24px;text-align:center;color:#111">
+      <div style="font-size:34px;margin-bottom:8px">⚠️</div>
+      <div style="font-size:17px;font-weight:800;color:#b91c1c;margin-bottom:16px">Product Out of Stock</div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;overflow:hidden">
+        <tr><td style="padding:10px 14px;color:#7f1d1d;font-weight:600">Product</td><td style="padding:10px 14px;text-align:right;font-weight:800;color:#111">${product.name}</td></tr>
+        ${product.category ? `<tr><td style="padding:10px 14px;color:#7f1d1d;font-weight:600;border-top:1px solid #fecaca">Category</td><td style="padding:10px 14px;text-align:right;border-top:1px solid #fecaca">${product.category}</td></tr>` : ''}
+        ${product.barcode ? `<tr><td style="padding:10px 14px;color:#7f1d1d;font-weight:600;border-top:1px solid #fecaca">Barcode</td><td style="padding:10px 14px;text-align:right;border-top:1px solid #fecaca">${product.barcode}</td></tr>` : ''}
+      </table>
+      <a href="${APP_URL}/products" style="display:inline-block;margin-top:20px;padding:11px 26px;background:#059669;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:800;font-size:13px">Restock Now →</a>
+    </div>
+
+    <div style="text-align:center;font-size:10.5px;color:#999;border-top:1px dashed #ccc;padding:14px 20px;background:#fafafa">
+      Automated alert from Gapuz POS — restock this item before it affects sales.
     </div>
   </div>`
 }

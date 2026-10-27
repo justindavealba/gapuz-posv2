@@ -18,43 +18,52 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const LOGO_URL = 'https://gapuzpos.vercel.app/logo.png'
 const peso = (n: number) => `₱${(n || 0).toFixed(2)}`
 
 function receiptHtml(txn: any) {
   const items = (txn.items || []).map((i: any) => `
     <tr>
-      <td style="padding:4px 0;font-size:13px;color:#111">${i.name}</td>
-      <td style="padding:4px 0;font-size:13px;color:#555;text-align:center">x${i.qty}</td>
-      <td style="padding:4px 0;font-size:13px;color:#111;text-align:right">${peso(i.price * i.qty)}</td>
+      <td style="padding:5px 0;font-size:13px;color:#111">${i.name}</td>
+      <td style="padding:5px 0;font-size:13px;color:#666;text-align:center">x${i.qty}</td>
+      <td style="padding:5px 0;font-size:13px;color:#111;text-align:right;font-weight:600">${peso(i.price * i.qty)}</td>
     </tr>`).join('')
 
   return `
-  <div style="font-family:'Courier New',monospace;max-width:340px;margin:0 auto;padding:20px;color:#111">
-    <div style="text-align:center;border-bottom:1px dashed #ccc;padding-bottom:10px;margin-bottom:10px">
-      <div style="font-size:16px;font-weight:700">GAPUZ COMPUTER</div>
-      <div style="font-weight:700">SERVICES & ACCESSORIES</div>
-      <div style="font-size:11px;color:#555">Door 2 NGAP Building, Purok 3</div>
-      <div style="font-size:11px;color:#555">Tablon, Cagayan de Oro City</div>
+  <div style="max-width:380px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);font-family:Arial,sans-serif">
+    <div style="background:#059669;padding:24px 20px;text-align:center">
+      <img src="${LOGO_URL}" width="48" height="48" alt="Gapuz" style="border-radius:50%;display:block;margin:0 auto 10px;border:2px solid rgba(255,255,255,0.4)"/>
+      <div style="color:#ffffff;font-size:15px;font-weight:800;letter-spacing:.3px">GAPUZ COMPUTER</div>
+      <div style="color:rgba(255,255,255,0.85);font-size:10.5px;font-weight:700;letter-spacing:.5px;margin-top:2px">SERVICES & ACCESSORIES</div>
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:10px">
-      <span>#${String(txn.id).padStart(4, '0')}</span>
-      <span>${new Date(txn.createdAt).toLocaleString('en-PH')}</span>
+
+    <div style="padding:22px 20px;font-family:'Courier New',monospace;color:#111">
+      <div style="text-align:center;font-size:10.5px;color:#888;margin-bottom:14px">
+        Door 2 NGAP Building, Purok 3 · Tablon, Cagayan de Oro City
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#555;background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:12px">
+        <span style="font-weight:700;color:#059669">#${String(txn.id).padStart(4, '0')}</span>
+        <span>${new Date(txn.createdAt).toLocaleString('en-PH')}</span>
+      </div>
+      <div style="font-size:11.5px;color:#555;margin-bottom:12px">
+        Customer: <strong style="color:#111">${txn.customerName || 'Walk-in'}</strong>
+      </div>
+      <table style="width:100%;border-top:1px dashed #ccc;border-bottom:1px dashed #ccc;padding:8px 0;border-collapse:collapse">
+        <tbody>${items}</tbody>
+      </table>
+      <div style="font-size:12px;margin-top:10px">
+        <div style="display:flex;justify-content:space-between;color:#555;padding:2px 0"><span>Subtotal</span><span>${peso(txn.subtotal)}</span></div>
+        ${txn.discAmt > 0 ? `<div style="display:flex;justify-content:space-between;color:#dc2626;padding:2px 0"><span>Discount</span><span>-${peso(txn.discAmt)}</span></div>` : ''}
+        <div style="display:flex;justify-content:space-between;color:#555;padding:2px 0"><span>VAT (12%)</span><span>${peso(txn.vat)}</span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:17px;background:#ecfdf5;border-radius:8px;padding:10px 12px;margin-top:10px">
+        <span style="color:#065f46">TOTAL</span><span style="color:#059669">${peso(txn.total)}</span>
+      </div>
+      <div style="margin-top:10px;font-size:11.5px;color:#555;text-align:center">Payment: <strong style="color:#111">${txn.payment}</strong></div>
     </div>
-    <div style="font-size:11px;color:#555;margin-bottom:10px">
-      Customer: ${txn.customerName || 'Walk-in'}
-    </div>
-    <table style="width:100%;border-top:1px dashed #ccc;border-bottom:1px dashed #ccc;padding:8px 0;border-collapse:collapse">
-      <tbody>${items}</tbody>
-    </table>
-    <div style="font-size:12px;margin-top:8px">
-      <div style="display:flex;justify-content:space-between;color:#555"><span>Subtotal</span><span>${peso(txn.subtotal)}</span></div>
-      ${txn.discAmt > 0 ? `<div style="display:flex;justify-content:space-between;color:#555"><span>Discount</span><span>-${peso(txn.discAmt)}</span></div>` : ''}
-      <div style="display:flex;justify-content:space-between;color:#555"><span>VAT (12%)</span><span>${peso(txn.vat)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;border-top:1px solid #ccc;padding-top:4px;margin-top:4px"><span>TOTAL</span><span>${peso(txn.total)}</span></div>
-      <div style="margin-top:6px;color:#555">Payment: ${txn.payment}</div>
-    </div>
-    <div style="text-align:center;font-size:11px;color:#888;border-top:1px dashed #ccc;padding-top:10px;margin-top:14px">
-      <div>Thank you for shopping at Gapuz!</div>
+
+    <div style="text-align:center;font-size:10.5px;color:#999;border-top:1px dashed #ccc;padding:14px 20px;background:#fafafa">
+      <div style="font-weight:700;color:#059669;margin-bottom:2px">Thank you for shopping at Gapuz!</div>
       <div>Items are non-refundable after 7 days.</div>
     </div>
   </div>`

@@ -101,9 +101,9 @@ export const useStaffStore = create((set, get) => ({
     return { error: null }
   },
 
-  updateStaff: async ({ id, name, email, password }) => {
+  updateStaff: async ({ id, name, email, password, role }) => {
     const { data, error } = await supabase.functions.invoke('update-staff', {
-      body: { id, name: name.trim(), email: email.trim(), password: password?.trim() || undefined },
+      body: { id, name: name.trim(), email: email.trim(), password: password?.trim() || undefined, role },
     })
     if (error) {
       const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)
@@ -117,6 +117,19 @@ export const useStaffStore = create((set, get) => ({
   toggleStaffStatus: async ({ id, active }) => {
     const { data, error } = await supabase.functions.invoke('toggle-staff-status', {
       body: { id, active },
+    })
+    if (error) {
+      const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)
+      return { error: { message: serverMsg || error.message } }
+    }
+    if (data?.error) return { error: { message: data.error } }
+    await get().fetchStaff()
+    return { error: null }
+  },
+
+  deleteStaff: async (id) => {
+    const { data, error } = await supabase.functions.invoke('delete-staff', {
+      body: { id },
     })
     if (error) {
       const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)

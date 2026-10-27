@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { UserPlus, Pencil, X, User, Mail, Lock, Eye, EyeOff, UserX, UserCheck, AlertTriangle } from 'lucide-react'
-import { useStaffStore } from '../store'
+import { UserPlus, Pencil, X, User, Mail, Lock, Eye, EyeOff, UserX, UserCheck, AlertTriangle, Trash2, Search, ShieldAlert } from 'lucide-react'
+import { useStaffStore, useAuthStore } from '../store'
 import { useToast } from '../utils/toast'
 import { useT, fmtDate } from '../utils/helpers'
 
-const EMPTY = { name:'', email:'', password:'', confirmPassword:'' }
+const EMPTY = { name:'', email:'', password:'', confirmPassword:'', role:'cashier' }
 
 const AVATAR_COLORS = [
   { bg: 'var(--accent)', fg: '#0a0a0a' },
@@ -60,20 +60,29 @@ function Spinner({ size=14, color='currentColor' }) {
 }
 
 export default function Staff() {
-  const { staff, loading, addCashier, updateStaff, toggleStaffStatus } = useStaffStore()
+  const { staff, loading, addCashier, updateStaff, toggleStaffStatus, deleteStaff } = useStaffStore()
+  const myId = useAuthStore(s=>s.user?.id)
   const [modal,          setModal]          = useState(null) // 'add' | 'edit' | null
   const [form,           setForm]           = useState(EMPTY)
   const [selected,       setSelected]       = useState(null)
   const [saving,         setSaving]         = useState(false)
+  const [search,         setSearch]         = useState('')
   const [statusConfirm,  setStatusConfirm]  = useState(null) // staff member pending suspend/reactivate confirmation
   const [togglingId,     setTogglingId]     = useState(null) // id currently being suspended/reactivated
+  const [deleteConfirm,  setDeleteConfirm]  = useState(null) // staff member pending delete confirmation
+  const [deletingId,     setDeletingId]     = useState(null) // id currently being deleted
   const toast = useToast()
   const t     = useT()
 
   const openAdd    = () => { setForm(EMPTY); setModal('add') }
-  const openEdit   = (s) => { setForm({ name:s.name, email:s.email||'', password:'', confirmPassword:'' }); setSelected(s); setModal('edit') }
+  const openEdit   = (s) => { setForm({ name:s.name, email:s.email||'', password:'', confirmPassword:'', role:s.role }); setSelected(s); setModal('edit') }
   const closeModal = () => setModal(null)
   const isAdd = modal === 'add'
+
+  const filtered = staff.filter(s=>{
+    const q = search.trim().toLowerCase()
+    return !q || s.name.toLowerCase().includes(q) || (s.email||'').toLowerCase().includes(q)
+  })
 
   const handleSave = async () => {
     if (!form.name.trim())  return toast('Name is required', 'error')
@@ -85,7 +94,7 @@ export default function Staff() {
     setSaving(true)
     const { error } = isAdd
       ? await addCashier(form)
-      : await updateStaff({ id: selected.id, name: form.name, email: form.email, password: form.password })
+      : await updateStaff({ id: selected.id, name: form.name, email: form.email, password: form.password, role: form.role })
     setSaving(false)
     if (error) return toast(error.message || 'Could not save account', 'error')
     toast(isAdd ? t('cashier_added') : t('staff_updated'), 'success')
@@ -102,6 +111,14 @@ export default function Staff() {
 
   const handleToggleStatus = (s) => setStatusConfirm(s)
 
+  const runDelete = async (s) => {
+    setDeletingId(s.id)
+    const { error } = await deleteStaff(s.id)
+    setDeletingId(null)
+    if (error) return toast(error.message || 'Could not delete account', 'error')
+    toast(t('staff_deleted'), 'success')
+  }
+
   return (
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column',padding:20,gap:16}}>
       <div className="page-header">
@@ -109,6 +126,13 @@ export default function Staff() {
           <UserPlus size={18} style={{color:'var(--accent)'}}/>{t('staff_accounts')}
         </div>
         <button onClick={openAdd} className="btn-primary">+ {t('add_cashier')}</button>
+      </div>
+
+      <div style={{position:'relative', maxWidth:280, flexShrink:0}}>
+        <div style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',pointerEvents:'none',display:'flex',alignItems:'center',opacity:0.6}}>
+          <Search size={15}/>
+        </div>
+        <input className="input-field" style={{paddingLeft:40, width:'100%'}} placeholder={t('search_staff')} value={search} onChange={e=>setSearch(e.target.value)}/>
       </div>
 
       <div style={{flex:1,overflowY:'auto'}}>
@@ -122,8 +146,8 @@ export default function Staff() {
                   {t('loading')}
                 </div>
               </td></tr>
-              : staff.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
-              : staff.map(s=>{
+              : filtered.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
+              : filtered.map(s=>{
                 const ac = avatarColor(s.id)
                 const isSuspended = s.active === false
                 return (
@@ -145,6 +169,12 @@ export default function Staff() {
                         <button onClick={()=>handleToggleStatus(s)} disabled={togglingId===s.id} className={isSuspended?'btn-success':'btn-danger'} style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4,opacity:togglingId===s.id?0.7:1}}>
                           {togglingId===s.id ? <Spinner size={11}/> : isSuspended ? <UserCheck size={11}/> : <UserX size={11}/>}
                           {isSuspended?t('reactivate'):t('suspend')}
+                        </button>
+                      )}
+                      {s.id!==myId && (
+                        <button onClick={()=>setDeleteConfirm(s)} disabled={deletingId===s.id} className="btn-danger" style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4,opacity:deletingId===s.id?0.7:1}}>
+                          {deletingId===s.id ? <Spinner size={11}/> : <Trash2 size={11}/>}
+                          {t('delete')}
                         </button>
                       )}
                     </div>
@@ -185,6 +215,21 @@ export default function Staff() {
                   <label style={FIELD_LABEL}>{t('email_addr')} *</label>
                   <IconInput icon={Mail} type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="cashier@email.com"/>
                 </div>
+                {!isAdd && (
+                  <div>
+                    <label style={FIELD_LABEL}>{t('role')}</label>
+                    <select className="select-field" style={{width:'100%'}} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
+                      <option value="cashier">Cashier</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    {form.role !== selected?.role && (
+                      <div style={{display:'flex',alignItems:'flex-start',gap:6,marginTop:7,fontSize:11,color:'var(--yellow)'}}>
+                        <ShieldAlert size={13} style={{flexShrink:0,marginTop:1}}/>
+                        <span>{t('role_change_warning')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -241,6 +286,30 @@ export default function Staff() {
                         disabled={busy} className="btn-primary"
                         style={{flex:1,background:color,borderColor:color,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:6}}>
                   {busy && <Spinner size={13}/>}{actionLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Delete confirmation */}
+      {deleteConfirm && (() => {
+        const busy = deletingId === deleteConfirm.id
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)'}} onClick={e=>e.target===e.currentTarget&&!busy&&setDeleteConfirm(null)}>
+            <div className="card animate-scale-in" style={{width:'min(360px,92vw)',padding:28,textAlign:'center'}}>
+              <div style={{width:44,height:44,borderRadius:'50%',background:'rgba(239,68,68,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',color:'var(--red)'}}>
+                <Trash2 size={20}/>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>{t('delete')} {deleteConfirm.name}?</div>
+              <div style={{fontSize:12.5,color:'var(--text2)',lineHeight:1.5}}>{t('confirm_delete_staff')}</div>
+              <div style={{display:'flex',gap:10,marginTop:20}}>
+                <button onClick={()=>setDeleteConfirm(null)} disabled={busy} className="btn-secondary" style={{flex:1}}>{t('cancel')}</button>
+                <button onClick={async ()=>{ await runDelete(deleteConfirm); setDeleteConfirm(null) }}
+                        disabled={busy} className="btn-primary"
+                        style={{flex:1,background:'var(--red)',borderColor:'var(--red)',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                  {busy && <Spinner size={13}/>}{t('delete')}
                 </button>
               </div>
             </div>

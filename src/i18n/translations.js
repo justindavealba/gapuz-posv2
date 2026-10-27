@@ -116,6 +116,11 @@ export const translations = {
     confirm_suspend: 'Suspend this account? They won\'t be able to log in until reactivated.',
     staff_suspended: 'Account suspended',
     staff_reactivated: 'Account reactivated',
+    role:           'Role',
+    search_staff:   'Search staff...',
+    role_change_warning: 'Changing the role takes effect immediately after saving.',
+    confirm_delete_staff: 'This permanently deletes the account and can\'t be undone.',
+    staff_deleted:  'Account deleted',
 
     // Reports
     today:          'Today',
@@ -305,6 +310,11 @@ export const translations = {
     confirm_suspend: 'Suspindihin ang account na ito? Hindi sila makakapag-login hanggang ma-reactivate.',
     staff_suspended: 'Na-suspinde ang account',
     staff_reactivated: 'Na-reactivate ang account',
+    role:           'Tungkulin',
+    search_staff:   'Maghanap ng staff...',
+    role_change_warning: 'Agad magkakabisa ang pagbabago ng role pagkatapos i-save.',
+    confirm_delete_staff: 'Permanenteng mabubura ang account na ito at hindi na maibabalik.',
+    staff_deleted:  'Nabura ang account',
 
     // Reports
     today:          'Ngayon',

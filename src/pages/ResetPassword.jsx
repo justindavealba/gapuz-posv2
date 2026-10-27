@@ -4,11 +4,11 @@ import { useAuthStore } from '../store'
 import { useToast } from '../utils/toast'
 import { supabase } from '../lib/supabaseClient'
 
-// Module-scoped so the exchange survives React StrictMode's dev-only double
+// Module-scoped so the verification survives React StrictMode's dev-only double
 // effect invocation (mount → cleanup → remount) — without this, the second
-// invocation re-sends the same one-time code, which Supabase has already
+// invocation re-sends the same one-time token, which Supabase has already
 // consumed, and reports the link as invalid even though it was never actually bad.
-let exchangeInFlight = null
+let verifyInFlight = null
 
 export default function ResetPassword() {
   const [password, setPassword]               = useState('')
@@ -19,19 +19,25 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const toast    = useToast()
 
-  // The email link only carries a one-time code/token — supabase-js has to exchange
+  // The email link carries a one-time token_hash — supabase-js has to verify
   // that for an actual session before updateUser() will work. Without this, submitting
   // the form fails with "Auth session missing!" even though the link itself was valid.
+  // Uses verifyOtp (not the PKCE exchangeCodeForSession) specifically so the link also
+  // works when opened on a different device/browser than the one that requested it —
+  // PKCE requires a secret stored on the requesting device, which checking email on
+  // your phone (say) won't have.
   useEffect(() => {
     let settled = false
     const finish = (ok) => { if (!settled) { settled = true; setStatus(ok ? 'ready' : 'invalid') } }
 
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (code) {
-      if (!exchangeInFlight || exchangeInFlight.code !== code) {
-        exchangeInFlight = { code, promise: supabase.auth.exchangeCodeForSession(code) }
+    const params = new URLSearchParams(window.location.search)
+    const tokenHash = params.get('token_hash')
+    const type = params.get('type')
+    if (tokenHash && type) {
+      if (!verifyInFlight || verifyInFlight.tokenHash !== tokenHash) {
+        verifyInFlight = { tokenHash, promise: supabase.auth.verifyOtp({ token_hash: tokenHash, type }) }
       }
-      exchangeInFlight.promise.then(({ error }) => finish(!error))
+      verifyInFlight.promise.then(({ error }) => finish(!error))
     }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {

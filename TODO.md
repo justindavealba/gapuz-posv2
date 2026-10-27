@@ -43,7 +43,19 @@ to remove with `supabase functions delete check-email` if you want to tidy up.
       (bans/unbans via GoTrue's admin API so suspension actually blocks
       login, not just an app-side flag), Status column + Suspend/Reactivate
       button on `/staff` (cashier rows only), and a clear "account suspended"
-      message on the login page instead of a generic error.
+      message on the login page instead of a generic error. Suspend/Reactivate
+      use a themed confirm modal (not a browser popup) with a loading spinner,
+      not window.confirm.
+- [x] Permanent delete for a mistakenly-created account.
+      Done: new `delete-staff` edge function — blocks deleting your own
+      account or the only remaining admin; Delete button + confirm modal on
+      every row except the signed-in admin's own.
+- [x] Promote a cashier to admin (or demote an admin back to cashier).
+      Done: Role dropdown added to the Edit Staff modal (edit mode only),
+      with an inline warning that the change is immediate; `update-staff`
+      blocks demoting the only remaining admin.
+- [x] Search/filter on the staff list.
+      Done: search box above the table filters by name/email, client-side.
 
 ## Reliability
 - [ ] Brevo's free tier caps at 300 emails/day — fine for now, but worth

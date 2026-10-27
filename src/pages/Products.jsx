@@ -1,14 +1,35 @@
 import { useState, useEffect } from 'react'
-import { Package, Camera, Plus, Pencil, AlertTriangle, TrendingUp, Tags, X, Check } from 'lucide-react'
+import { Package, Plus, Pencil, AlertTriangle, TrendingUp, Tags, X, Check, Sparkles } from 'lucide-react'
 import { useProductStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, peso, stockStatus, genBarcode, categoryIcon, BADGE_SWATCHES } from '../utils/helpers'
+import { useT, peso, stockStatus, genBarcode, categoryIcon, ICON_MAP, ICON_OPTIONS, BADGE_SWATCHES } from '../utils/helpers'
+import ProductThumb from '../components/ProductThumb'
 
 const EMPTY = { name:'', category:'', price:'', costPrice:'', stock:'', barcode:'', image:'' }
 
+// Shared by the "new category" form and each category's inline editor —
+// "Auto" (empty value) means fall back to categoryIcon()'s keyword guess.
+function IconPicker({ value, onChange, mutedText }) {
+  return (
+    <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+      <button type="button" onClick={()=>onChange('')} title="Auto-detect" style={{width:26,height:26,borderRadius:7,border:value===''?'2px solid var(--accent)':'1px solid var(--border2)',background:'var(--bg3)',color:value===''?'var(--accent)':mutedText,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <Sparkles size={13}/>
+      </button>
+      {ICON_OPTIONS.map(key=>{
+        const Icon = ICON_MAP[key]
+        return (
+          <button type="button" key={key} onClick={()=>onChange(key)} title={key} style={{width:26,height:26,borderRadius:7,border:value===key?'2px solid var(--accent)':'1px solid var(--border2)',background:'var(--bg3)',color:value===key?'var(--accent)':mutedText,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Icon size={14}/>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Products() {
   const { products, loading, addProduct, updateProduct, deleteProduct, restockProduct } = useProductStore()
-  const { categories, addCategory, deleteCategory } = useCategoryStore()
+  const { categories, addCategory, updateCategory, deleteCategory } = useCategoryStore()
   const [search,    setSearch]    = useState('')
   const [catFilter, setCatFilter] = useState('All')
   const [sortBy,    setSortBy]    = useState('name')
@@ -20,7 +41,11 @@ export default function Products() {
   const [page,      setPage]      = useState(1)
   const [newCatName, setNewCatName] = useState('')
   const [newCatColor,setNewCatColor]= useState(BADGE_SWATCHES[0].cls)
+  const [newCatIcon, setNewCatIcon] = useState('')
   const [catPage,    setCatPage]    = useState(1)
+  const [editingCatId,setEditingCatId]=useState(null)
+  const [editColor,  setEditColor]  = useState(BADGE_SWATCHES[0].cls)
+  const [editIcon,   setEditIcon]   = useState('')
   const PAGE_SIZE = 6
   const CAT_PAGE_SIZE = 5
   const { theme } = useAppStore()
@@ -88,10 +113,10 @@ export default function Products() {
     const name = newCatName.trim()
     if(!name) return toast('Category name is required','error')
     if(categories.some(c=>c.name.toLowerCase()===name.toLowerCase())) return toast('That category already exists','error')
-    const added = await addCategory(name, newCatColor)
+    const added = await addCategory(name, newCatColor, newCatIcon)
     if(!added) return toast('Failed to add category','error')
     toast('Category added','success')
-    setNewCatName('')
+    setNewCatName(''); setNewCatIcon('')
     setCatPage(Math.max(1, Math.ceil((categories.length+1)/CAT_PAGE_SIZE)))
   }
 
@@ -101,6 +126,15 @@ export default function Products() {
     if(!window.confirm(`Delete category "${cat.name}"?`)) return
     const ok = await deleteCategory(cat.id)
     if(ok) toast('Category deleted','info')
+  }
+
+  const openEditCat  = (c) => { setEditingCatId(c.id); setEditColor(c.badgeColor); setEditIcon(c.icon||'') }
+  const closeEditCat = () => setEditingCatId(null)
+  const handleSaveCatEdit = async (cat) => {
+    const ok = await updateCategory(cat.id, { badgeColor:editColor, icon:editIcon })
+    if(!ok) return toast('Failed to update category','error')
+    toast('Category updated','success')
+    closeEditCat()
   }
 
   const filtered = products
@@ -151,7 +185,7 @@ export default function Products() {
         <select className="select-field" value={sortBy} onChange={e=>setSortBy(e.target.value)}>
           <option value="name">Name A–Z</option><option value="price-asc">Price ↑</option><option value="price-desc">Price ↓</option><option value="stock">Stock</option><option value="sold">Best Selling</option>
         </select>
-        <button onClick={()=>{setCatPage(1);setModal('categories')}} className="btn-secondary" style={{fontSize:12,display:'flex',alignItems:'center',gap:6}}><Tags size={14}/>Categories</button>
+        <button onClick={()=>{setCatPage(1);setEditingCatId(null);setModal('categories')}} className="btn-secondary" style={{fontSize:12,display:'flex',alignItems:'center',gap:6}}><Tags size={14}/>Categories</button>
       </div>
       <div style={{flex:1,overflowY:'auto'}}>
         <div className="tbl-wrap">
@@ -245,13 +279,7 @@ export default function Products() {
                   display:'flex', alignItems:'center', gap:10, padding:'6px 12px', borderRadius:10, 
                   background:'var(--bg3)', border:'1px solid var(--border2)', cursor:'pointer', transition:'all .15s'
                 }} onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border2)'}>
-                  <div style={{width:28, height:28, borderRadius:6, background:'var(--bg4)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0, border:'1px solid var(--border)'}}>
-                    {form.image && (form.image.startsWith('data:') || form.image.startsWith('http')) ? (
-                      <img src={form.image} style={{width:'100%', height:'100%', objectFit:'cover'}} alt=""/>
-                    ) : (
-                      <span style={{fontSize:12}}>{form.image || <Camera size={13}/>}</span>
-                    )}
-                  </div>
+                  <ProductThumb image={form.image} category={form.category} size={28} radius={6}/>
                   <div style={{flex:1, fontSize:11, fontWeight:700, color:form.image?'var(--text)':'var(--text3)'}}>
                     {form.image ? 'Change Image' : 'Upload Image'}
                   </div>
@@ -303,11 +331,30 @@ export default function Products() {
               :catPageItems.map(c=>{
                 const count = products.filter(p=>p.category===c.name).length
                 const hex = BADGE_SWATCHES.find(s=>s.cls===c.badgeColor)?.hex || '#34d399'
+                const CatIcon = (c.icon && ICON_MAP[c.icon]) || categoryIcon(c.name)
+                if(editingCatId===c.id) return (
+                  <div key={c.id} style={{padding:10,borderRadius:8,background:'var(--bg3)',border:'1px solid var(--border2)'}}>
+                    <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:'var(--text)'}}>{c.name}</div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      {BADGE_SWATCHES.map(s=>(
+                        <button key={s.cls} type="button" onClick={()=>setEditColor(s.cls)} style={{width:20,height:20,borderRadius:'50%',background:s.hex,border:editColor===s.cls?'2px solid var(--text)':'2px solid transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+                          {editColor===s.cls&&<Check size={10} color="#fff"/>}
+                        </button>
+                      ))}
+                    </div>
+                    <IconPicker value={editIcon} onChange={setEditIcon} mutedText={mutedText}/>
+                    <div style={{display:'flex',gap:8,marginTop:12,justifyContent:'flex-end'}}>
+                      <button onClick={closeEditCat} className="btn-secondary" style={{fontSize:11,padding:'5px 12px'}}>{t('cancel')}</button>
+                      <button onClick={()=>handleSaveCatEdit(c)} className="btn-primary" style={{fontSize:11,padding:'5px 12px'}}>{t('save')}</button>
+                    </div>
+                  </div>
+                )
                 return (
                   <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,background:'var(--bg3)'}}>
-                    <span style={{width:12,height:12,borderRadius:'50%',background:hex,flexShrink:0}}/>
+                    <div style={{width:24,height:24,borderRadius:6,background:`${hex}1a`,border:`1px solid ${hex}40`,display:'flex',alignItems:'center',justifyContent:'center',color:hex,flexShrink:0}}><CatIcon size={13}/></div>
                     <div style={{flex:1,minWidth:0,fontSize:12,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
                     <div style={{fontSize:10,color:mutedText,flexShrink:0}}>{count} product{count===1?'':'s'}</div>
+                    <button onClick={()=>openEditCat(c)} style={{background:'none',border:'none',color:mutedText,cursor:'pointer',padding:2,display:'flex',flexShrink:0}}><Pencil size={13}/></button>
                     <button onClick={()=>handleDeleteCategory(c)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',padding:2,display:'flex',flexShrink:0}}><X size={14}/></button>
                   </div>
                 )
@@ -335,6 +382,7 @@ export default function Products() {
                   </button>
                 ))}
               </div>
+              <IconPicker value={newCatIcon} onChange={setNewCatIcon} mutedText={mutedText}/>
               <div style={{display:'flex',gap:10,marginTop:16,justifyContent:'flex-end'}}>
                 <button onClick={()=>setModal(null)} className="btn-secondary">{t('close')||'Close'}</button>
                 <button onClick={handleAddCategory} className="btn-primary">Add Category</button>

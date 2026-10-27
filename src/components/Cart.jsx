@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient'
 import { peso, fmtTxnId, useT, useBreakpoint } from '../utils/helpers'
 import { useToast } from '../utils/toast'
 import Receipt from './Receipt'
+import ProductThumb from './ProductThumb'
 
 const PAY = [{id:'Cash',label:'Cash',icon:Banknote},{id:'GCash',label:'GCash',icon:Smartphone},{id:'Card',label:'Card',icon:CreditCard}]
 
@@ -129,13 +130,7 @@ export default function Cart({ products, customers, onHold }) {
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:8}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                      <div style={{width:24,height:24,borderRadius:6,background:'var(--bg4)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,border:'1px solid var(--border)'}}>
-                        {item.image && (item.image.startsWith('data:') || item.image.startsWith('http')) ? (
-                          <img src={item.image} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
-                        ) : (
-                          <span style={{fontSize:12}}>{item.image || <Package size={13}/>}</span>
-                        )}
-                      </div>
+                      <ProductThumb image={item.image} icon={item.icon} category={item.category} size={24} radius={6}/>
                       <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{item.name}</span>
                     </div>
                     <div style={{fontSize:10,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{peso(item.price)} each</div>

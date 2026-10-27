@@ -92,9 +92,22 @@ to remove with `supabase functions delete check-email` if you want to tidy up.
       customer data.
 
 ## Product icons (follow-up to the category-icon fallback)
-- [ ] Extend the same category-icon fallback to Cart line items, Dashboard's
+- [x] Extend the same category-icon fallback to Cart line items, Dashboard's
       Top Products/Best Seller card, and Reports tables.
-- [ ] Preview the category icon live in the Add/Edit Product modal's image
+      Done: new shared `ProductThumb` component (`src/components/ProductThumb.jsx`)
+      wraps the photo → emoji → category-icon fallback Products.jsx already had,
+      now reused in Cart line items, every Top/Least Selling Products list on
+      Dashboard (all three tabs) and the standalone Reports page, plus Reports'
+      Old/Low/New Stock lists and the Loss tab's three tables.
+- [x] Preview the category icon live in the Add/Edit Product modal's image
       upload placeholder (currently a generic camera icon).
-- [ ] Let admins override the auto-matched icon per category, for categories
+      Done: swapped the placeholder for `ProductThumb`, so with no photo
+      uploaded it now shows the selected category's icon and updates live
+      as the category dropdown changes.
+- [x] Let admins override the auto-matched icon per category, for categories
       the keyword matching doesn't handle well.
+      Done: new `icon` column on `categories` (migration
+      `add_category_icon.sql`), a shared icon-picker grid (21 icons + "Auto")
+      used both when creating a category and via a new per-row Edit button
+      in Manage Categories, and `ProductThumb` now prefers a category's
+      pinned icon over the keyword guess when one is set.

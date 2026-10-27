@@ -4,6 +4,7 @@ import { useT, peso, pesoCompact, getTier } from '../utils/helpers'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { CHART_COLORS, ACCENT, RED, YELLOW, PURPLE, SLATE } from '../utils/colors'
 import { BarChart3, Download, Trophy, TrendingDown, Archive, AlertTriangle, PackagePlus, AlertOctagon, Award, Star, ClipboardList, Clock, Package, CreditCard, Receipt } from 'lucide-react'
+import ProductThumb from '../components/ProductThumb'
 
 const TabIcon = ({ children }) => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
@@ -219,6 +220,7 @@ export default function Reports(){
               :topProds.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:COLORS[i],width:`${Math.round((p.sold/(topProds[0]?.sold||1))*100)}%`}}/></div>
@@ -238,6 +240,7 @@ export default function Reports(){
               :leastProds.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--red)',width:p.sold===0?'4%':`${Math.min(100,Math.round((p.sold/(topProds[0]?.sold||1))*100))}%`}}/></div>
@@ -317,9 +320,12 @@ export default function Reports(){
               const daysSinceLastSold=lastSold?Math.floor((now-lastSold)/(1000*60*60*24)):999
               return(
                 <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:500}}>{p.name}</div>
-                    <div style={{fontSize:10,color:'var(--text3)'}}>Added {daysSinceAdded}d ago · Last sold {daysSinceLastSold===999?'never':`${daysSinceLastSold}d ago`}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                    <ProductThumb image={p.image} icon={p.icon} category={p.category} size={26} radius={6}/>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
+                      <div style={{fontSize:10,color:'var(--text3)'}}>Added {daysSinceAdded}d ago · Last sold {daysSinceLastSold===999?'never':`${daysSinceLastSold}d ago`}</div>
+                    </div>
                   </div>
                   <div style={{textAlign:'right'}}>
                     <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,color:'var(--red)'}}>{p.stock} left</div>
@@ -335,9 +341,12 @@ export default function Reports(){
             <div style={{fontWeight:600,fontSize:13,marginBottom:12,display:'flex',alignItems:'center',gap:6}}><AlertTriangle size={13} style={{color:'var(--yellow)'}}/>Low Stock</div>
             {lowStock.length===0?<div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:20}}>All good!</div>
             :lowStock.map(p=>(
-              <div key={p.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
-                <div><div style={{fontSize:12,fontWeight:500}}>{p.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.category}</div></div>
-                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:'var(--yellow)'}}>{p.stock} left</span>
+              <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                  <ProductThumb image={p.image} icon={p.icon} category={p.category} size={26} radius={6}/>
+                  <div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.category}</div></div>
+                </div>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:'var(--yellow)',flexShrink:0}}>{p.stock} left</span>
               </div>
             ))}
           </div>
@@ -348,9 +357,12 @@ export default function Reports(){
               const added=p.createdAt?new Date(p.createdAt):null
               const daysAgo=added?Math.floor((now-added)/(1000*60*60*24)):0
               return(
-                <div key={p.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
-                  <div><div style={{fontSize:12,fontWeight:500}}>{p.name}</div><div style={{fontSize:10,color:'var(--accent)'}}>Added {daysAgo} day(s) ago</div></div>
-                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,color:'var(--accent)'}}>{peso(p.price)}</span>
+                <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                    <ProductThumb image={p.image} icon={p.icon} category={p.category} size={26} radius={6}/>
+                    <div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div><div style={{fontSize:10,color:'var(--accent)'}}>Added {daysAgo} day(s) ago</div></div>
+                  </div>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,color:'var(--accent)',flexShrink:0}}>{peso(p.price)}</span>
                 </div>
               )
             })}
@@ -386,7 +398,7 @@ export default function Reports(){
               <tbody>
                 {lossProdPageItems.map(p=>(
                   <tr key={p.id}>
-                    <td style={{fontSize:12,fontWeight:500}}>{p.name}</td>
+                    <td style={{fontSize:12,fontWeight:500}}><div style={{display:'flex',alignItems:'center',gap:8}}><ProductThumb image={p.image} icon={p.icon} category={p.category} size={22} radius={5}/>{p.name}</div></td>
                     <td><span className="badge badge-accent" style={{fontSize:10}}>{p.category}</span></td>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--text3)'}}>{peso(p.costPrice)}</td>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)',fontWeight:700}}>{peso(p.price)}</td>
@@ -420,7 +432,7 @@ export default function Reports(){
               <tbody>
                 {lowMarginPageItems.map(p=>(
                   <tr key={p.id}>
-                    <td style={{fontSize:12,fontWeight:500}}>{p.name}</td>
+                    <td style={{fontSize:12,fontWeight:500}}><div style={{display:'flex',alignItems:'center',gap:8}}><ProductThumb image={p.image} icon={p.icon} category={p.category} size={22} radius={5}/>{p.name}</div></td>
                     <td><span className="badge badge-accent" style={{fontSize:10}}>{p.category}</span></td>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--text3)'}}>{peso(p.costPrice)}</td>
                     <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{peso(p.price)}</td>
@@ -452,7 +464,7 @@ export default function Reports(){
                 <tbody>
                   {soldAtLoss.map(p=>(
                     <tr key={p.name}>
-                      <td style={{fontSize:12,fontWeight:500}}>{p.name}</td>
+                      <td style={{fontSize:12,fontWeight:500}}><div style={{display:'flex',alignItems:'center',gap:8}}><ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={22} radius={5}/>{p.name}</div></td>
                       <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{p.sold}</td>
                       <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)'}}>{peso(p.lossPerUnit)}</td>
                       <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:'var(--red)',fontWeight:700}}>{peso(p.totalLoss)}</td>

@@ -134,6 +134,7 @@ CREATE TABLE categories (
   category_id SERIAL PRIMARY KEY,
   name        VARCHAR(50) NOT NULL UNIQUE,
   badge_color VARCHAR(20) NOT NULL DEFAULT 'badge-accent',
+  icon        VARCHAR(30),
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

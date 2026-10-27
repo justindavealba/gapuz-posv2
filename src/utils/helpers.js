@@ -58,6 +58,15 @@ export const categoryIcon = (categoryName) => {
   return match ? match[1] : Package
 }
 
+// Icon choices an admin can manually pin to a category (stored as the key,
+// e.g. "Cpu") when the keyword-based categoryIcon() guess doesn't fit.
+export const ICON_MAP = {
+  Cpu, CircuitBoard, MemoryStick, HardDrive, Laptop, Monitor, Keyboard, Mouse,
+  Headphones, Webcam, Printer, Router, Usb, Cable, Fan, BatteryCharging,
+  Gamepad2, Smartphone, Tablet, Wrench, Package,
+}
+export const ICON_OPTIONS = Object.keys(ICON_MAP)
+
 export const REFUND_REASONS =['Defective product','Wrong item delivered','Customer changed mind','Item not as described','Duplicate purchase','Other']
 
 // Categories now live in the `categories` table (see useCategoryStore) so admins can

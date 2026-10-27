@@ -4,6 +4,7 @@ import { Trophy, TrendingDown, AlertTriangle, Ban, CheckCircle2, Package, Wallet
 import { useTransactionStore, useProductStore, useAuthStore, useCustomerStore, useRefundStore } from '../store'
 import { useT, peso, pesoCompact, getTier } from '../utils/helpers'
 import { CHART_COLORS, ACCENT, RED, YELLOW, PURPLE, SLATE } from '../utils/colors'
+import ProductThumb from '../components/ProductThumb'
 
 const COLORS = CHART_COLORS
 
@@ -211,6 +212,7 @@ export default function Dashboard() {
               :topProds.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:COLORS[i],width:`${Math.round((p.sold/(topProds[0]?.sold||1))*100)}%`,transition:'width .5s'}}/></div>
@@ -234,6 +236,7 @@ export default function Dashboard() {
             :leastPageItems.map((p,i)=>(
               <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:18}}>{(leastPage-1)*LEAST_PAGE_SIZE+i+1}</span>
+                <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                   <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--red)',width:p.sold===0?'4%':`${Math.min(100,Math.round((p.sold/(topProds[0]?.sold||1))*100))}%`,transition:'width .5s'}}/></div>
@@ -384,6 +387,7 @@ export default function Dashboard() {
               :topProds.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--accent)',width:`${Math.round((p.sold/(topProds[0]?.sold||1))*100)}%`}}/></div>
@@ -576,6 +580,7 @@ export default function Dashboard() {
               :repTop.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--text3)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--accent)',width:`${Math.round((p.sold/(repTop[0]?.sold||1))*100)}%`}}/></div>
@@ -595,6 +600,7 @@ export default function Dashboard() {
               :repLeast.map((p,i)=>(
                 <div key={p.name} style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:11,color:'var(--red)',fontFamily:"'JetBrains Mono',monospace",width:14}}>{i+1}</span>
+                  <ProductThumb {...(products.find(pr=>pr.name===p.name)||{})} size={24} radius={6}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
                     <div style={{marginTop:3,height:3,background:'var(--bg5)',borderRadius:2,overflow:'hidden'}}><div style={{height:'100%',borderRadius:2,background:'var(--red)',width:p.sold===0?'4%':`${Math.min(100,Math.round((p.sold/(repTop[0]?.sold||1))*100))}%`}}/></div>

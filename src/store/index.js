@@ -286,7 +286,7 @@ export const useProductStore = create((set, get) => ({
 }))
 
 // ── CATEGORY STORE ───────────────────────────────────────────────
-const CATEGORY_SELECT = 'id:category_id, name, badgeColor:badge_color, sortOrder:sort_order'
+const CATEGORY_SELECT = 'id:category_id, name, badgeColor:badge_color, icon, sortOrder:sort_order'
 
 export const useCategoryStore = create((set, get) => ({
   categories: [],
@@ -299,14 +299,27 @@ export const useCategoryStore = create((set, get) => ({
     else set({ loading: false })
   },
 
-  addCategory: async (name, badgeColor) => {
+  addCategory: async (name, badgeColor, icon) => {
     const sortOrder = get().categories.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1
-    const row = { name: name.trim(), badge_color: badgeColor, sort_order: sortOrder }
+    const row = { name: name.trim(), badge_color: badgeColor, icon: icon || null, sort_order: sortOrder }
     const { data: inserted, error } = await supabase.from('categories').insert(row).select(CATEGORY_SELECT).single()
     if (error || !inserted) return null
     set(s => ({ categories: [...s.categories, inserted] }))
     logActivity('created', 'category', inserted.name)
     return inserted
+  },
+
+  updateCategory: async (id, data) => {
+    const name = get().categories.find(c => c.id === id)?.name
+    const row = {}
+    if ('badgeColor' in data) row.badge_color = data.badgeColor
+    if ('icon' in data) row.icon = data.icon || null
+    const { error } = await supabase.from('categories').update(row).eq('category_id', id)
+    if (!error) {
+      set(s => ({ categories: s.categories.map(c => c.id === id ? { ...c, ...data } : c) }))
+      logActivity('updated', 'category', name)
+    }
+    return !error
   },
 
   deleteCategory: async (id) => {

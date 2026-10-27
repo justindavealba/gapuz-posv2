@@ -60,16 +60,31 @@ to remove with `supabase functions delete check-email` if you want to tidy up.
 ## Reliability
 - [ ] Brevo's free tier caps at 300 emails/day — fine for now, but worth
       tracking if the shop's volume grows.
-- [ ] No activity/audit log (who processed a refund, deleted a product, etc.) —
+- [x] No activity/audit log (who processed a refund, deleted a product, etc.) —
       would help if disputes ever come up.
+      Done: new `activity_log` table (migration `add_activity_log.sql` — run
+      this manually in the Supabase SQL editor, same as the other
+      migrations) with RLS restricting reads to admins and no UPDATE/DELETE
+      policies, so entries can't be edited or removed through the app once
+      written. Logs staff create/update/suspend/reactivate/delete, product
+      create/update/delete/restock, category create/delete, customer delete,
+      and refund submit/approve/reject, each with the actor's name. New
+      admin-only "Activity Log" page under Management, with search and
+      pagination.
 
 ## Reports
 - [ ] Scheduled daily/weekly sales summary emailed to the admin (via the Brevo
       setup already in place), instead of manually checking the Reports page.
 
 ## Inventory
-- [ ] Proactive low-stock alert (email/notification) when a product actually
+- [x] Proactive low-stock alert (email/notification) when a product actually
       hits zero, instead of only showing a badge on the Products page.
+      Done: new `send-low-stock-alert` edge function (reuses the existing
+      Brevo SMTP secrets) emails every active admin with an email on file.
+      Triggered client-side the moment a product's stock crosses from above
+      zero to zero — at checkout (`deductStock`) and on a manual stock edit
+      (`updateProduct`) — not on a poll, so it fires once per event, not
+      repeatedly. Needs `supabase functions deploy send-low-stock-alert`.
 
 ## Data safety
 - [ ] Confirm the Supabase plan includes backups/point-in-time recovery — a

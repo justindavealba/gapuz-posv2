@@ -74,6 +74,45 @@ export const useAuthStore = create((set, get) => ({
   },
 }))
 
+// ── ACTIVITY LOG (audit trail — who did what, for disputes) ──────
+// Fire-and-forget: a logging failure must never block the action it's
+// recording (a delete, a refund decision, etc.), so errors are just logged
+// to the console instead of surfacing to the user.
+function logActivity(action, entityType, entityLabel, details) {
+  const { user } = useAuthStore.getState()
+  const actorName = user?.user_metadata?.name || user?.email || 'Unknown'
+  supabase.from('activity_log').insert({
+    actor_id: user?.id || null,
+    actor_name: actorName,
+    action,
+    entity_type: entityType,
+    entity_label: entityLabel || null,
+    details: details || null,
+  }).then(({ error }) => { if (error) console.error('activity log failed:', error.message) })
+}
+
+const LOG_SELECT = 'id:log_id, actorName:actor_name, action, entityType:entity_type, entityLabel:entity_label, details, createdAt:created_at'
+
+// Fire-and-forget: emails every active admin via the send-low-stock-alert
+// edge function. Call this only at the moment a product's stock crosses
+// from above zero down to zero, never on a poll, so it fires once per event.
+function notifyLowStock(product) {
+  supabase.functions.invoke('send-low-stock-alert', { body: { product } })
+    .then(({ error }) => { if (error) console.error('low-stock alert failed:', error.message) })
+}
+
+export const useActivityLogStore = create((set) => ({
+  logs: [],
+  loading: false,
+
+  fetchLogs: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase.from('activity_log').select(LOG_SELECT).order('created_at', { ascending: false }).limit(500)
+    if (!error) set({ logs: data, loading: false })
+    else set({ loading: false })
+  },
+}))
+
 // ── STAFF STORE (profiles — admin manages cashier accounts) ───────
 const STAFF_SELECT = 'id, name, email, role, active, createdAt:created_at'
 
@@ -98,10 +137,12 @@ export const useStaffStore = create((set, get) => ({
     }
     if (data?.error) return { error: { message: data.error } }
     await get().fetchStaff()
+    logActivity('created', 'staff', name.trim())
     return { error: null }
   },
 
   updateStaff: async ({ id, name, email, password, role }) => {
+    const prevRole = get().staff.find(s => s.id === id)?.role
     const { data, error } = await supabase.functions.invoke('update-staff', {
       body: { id, name: name.trim(), email: email.trim(), password: password?.trim() || undefined, role },
     })
@@ -111,10 +152,12 @@ export const useStaffStore = create((set, get) => ({
     }
     if (data?.error) return { error: { message: data.error } }
     await get().fetchStaff()
+    logActivity('updated', 'staff', name.trim(), prevRole && prevRole !== role ? { roleChange: `${prevRole} → ${role}` } : null)
     return { error: null }
   },
 
   toggleStaffStatus: async ({ id, active }) => {
+    const name = get().staff.find(s => s.id === id)?.name
     const { data, error } = await supabase.functions.invoke('toggle-staff-status', {
       body: { id, active },
     })
@@ -124,10 +167,12 @@ export const useStaffStore = create((set, get) => ({
     }
     if (data?.error) return { error: { message: data.error } }
     await get().fetchStaff()
+    logActivity(active ? 'reactivated' : 'suspended', 'staff', name)
     return { error: null }
   },
 
   deleteStaff: async (id) => {
+    const name = get().staff.find(s => s.id === id)?.name
     const { data, error } = await supabase.functions.invoke('delete-staff', {
       body: { id },
     })
@@ -136,7 +181,7 @@ export const useStaffStore = create((set, get) => ({
       return { error: { message: serverMsg || error.message } }
     }
     if (data?.error) return { error: { message: data.error } }
-    await get().fetchStaff()
+    logActivity('deleted', 'staff', name)
     return { error: null }
   },
 }))
@@ -177,6 +222,7 @@ export const useProductStore = create((set, get) => ({
     const { data: inserted, error } = await supabase.from('products').insert(row).select(PRODUCT_SELECT).single()
     if (error || !inserted) return null
     set(s => ({ products: [...s.products, inserted] }))
+    logActivity('created', 'product', inserted.name)
     return inserted
   },
 
@@ -190,33 +236,52 @@ export const useProductStore = create((set, get) => ({
     if ('barcode' in data) row.barcode = data.barcode
     if ('icon' in data) row.icon = data.icon
     if ('image' in data) row.image = data.image
+    const prev = get().products.find(p => p.id === id)
     const { error } = await supabase.from('products').update(row).eq('product_id', id)
-    if (!error) set(s => ({ products: s.products.map(p => p.id === id ? { ...p, ...data } : p) }))
+    if (!error) {
+      set(s => ({ products: s.products.map(p => p.id === id ? { ...p, ...data } : p) }))
+      logActivity('updated', 'product', data.name || prev?.name)
+      if ('stock' in data && prev?.stock > 0 && data.stock === 0) {
+        notifyLowStock({ name: data.name || prev?.name, category: data.category || prev?.category, barcode: data.barcode || prev?.barcode })
+      }
+    }
   },
 
   deleteProduct: async (id) => {
+    const name = get().products.find(p => p.id === id)?.name
     const { error } = await supabase.from('products').delete().eq('product_id', id)
-    if (!error) set(s => ({ products: s.products.filter(p => p.id !== id) }))
+    if (!error) {
+      set(s => ({ products: s.products.filter(p => p.id !== id) }))
+      logActivity('deleted', 'product', name)
+    }
   },
 
   deductStock: async (items) => {
+    const zeroedOut = []
     set(s => ({
       products: s.products.map(p => {
         const ci = items.find(i => i.id === p.id)
-        return ci ? { ...p, stock: Math.max(0, p.stock - ci.qty), sold: (p.sold || 0) + ci.qty } : p
+        if (!ci) return p
+        const newStock = Math.max(0, p.stock - ci.qty)
+        if (p.stock > 0 && newStock === 0) zeroedOut.push({ name: p.name, category: p.category, barcode: p.barcode })
+        return { ...p, stock: newStock, sold: (p.sold || 0) + ci.qty }
       })
     }))
     await Promise.all(items.map(ci => {
       const p = get().products.find(pp => pp.id === ci.id)
       return p ? supabase.from('products').update({ stock: p.stock, sold: p.sold }).eq('product_id', ci.id) : null
     }))
+    zeroedOut.forEach(notifyLowStock)
   },
 
   restockProduct: async (id, qty) => {
     const p = get().products.find(pp => pp.id === id)
     const newStock = (p?.stock || 0) + qty
     const { error } = await supabase.from('products').update({ stock: newStock }).eq('product_id', id)
-    if (!error) set(s => ({ products: s.products.map(p => p.id === id ? { ...p, stock: newStock } : p) }))
+    if (!error) {
+      set(s => ({ products: s.products.map(p => p.id === id ? { ...p, stock: newStock } : p) }))
+      logActivity('restocked', 'product', p?.name, { qty, newStock })
+    }
   },
 }))
 
@@ -240,12 +305,17 @@ export const useCategoryStore = create((set, get) => ({
     const { data: inserted, error } = await supabase.from('categories').insert(row).select(CATEGORY_SELECT).single()
     if (error || !inserted) return null
     set(s => ({ categories: [...s.categories, inserted] }))
+    logActivity('created', 'category', inserted.name)
     return inserted
   },
 
   deleteCategory: async (id) => {
+    const name = get().categories.find(c => c.id === id)?.name
     const { error } = await supabase.from('categories').delete().eq('category_id', id)
-    if (!error) set(s => ({ categories: s.categories.filter(c => c.id !== id) }))
+    if (!error) {
+      set(s => ({ categories: s.categories.filter(c => c.id !== id) }))
+      logActivity('deleted', 'category', name)
+    }
     return !error
   },
 }))
@@ -283,8 +353,12 @@ export const useCustomerStore = create((set, get) => ({
   },
 
   deleteCustomer: async (id) => {
+    const name = get().customers.find(c => c.id === id)?.name
     const { error } = await supabase.from('customers').delete().eq('customer_id', id)
-    if (!error) set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
+    if (!error) {
+      set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
+      logActivity('deleted', 'customer', name)
+    }
   },
 
   addPoints: async (id, total) => {
@@ -383,6 +457,7 @@ export const useRefundStore = create((set, get) => ({
     const { data: inserted, error } = await supabase.from('refunds').insert(row).select(REFUND_SELECT).single()
     if (error || !inserted) return null
     set(s => ({ refunds: [inserted, ...s.refunds] }))
+    logActivity('submitted', 'refund', `#${String(inserted.id).padStart(4, '0')}`, { total: inserted.total })
     return inserted
   },
 
@@ -390,7 +465,12 @@ export const useRefundStore = create((set, get) => ({
     const row = {}
     if ('status' in data) row.status = data.status
     const { error } = await supabase.from('refunds').update(row).eq('refund_id', id)
-    if (!error) set(s => ({ refunds: s.refunds.map(r => r.id === id ? { ...r, ...data } : r) }))
+    if (!error) {
+      const r = get().refunds.find(rr => rr.id === id)
+      set(s => ({ refunds: s.refunds.map(r => r.id === id ? { ...r, ...data } : r) }))
+      if (data.status === 'Approved') logActivity('approved', 'refund', `#${String(id).padStart(4, '0')}`, { total: r?.total })
+      else if (data.status === 'Rejected') logActivity('rejected', 'refund', `#${String(id).padStart(4, '0')}`, { total: r?.total })
+    }
   },
 }))
 

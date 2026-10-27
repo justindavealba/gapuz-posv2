@@ -48,6 +48,8 @@
   .input-field:focus{border-color:var(--accent);}
   .input-field::placeholder{color:var(--text3);}
   .input-field:disabled{opacity:.5;cursor:not-allowed;}
+  .qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+  .qty-input{-moz-appearance:textfield;}
   .select-field{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:9px 12px;font-size:14.5px;color:var(--text);outline:none;cursor:pointer;transition:border-color .15s;font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
   .select-field:focus{border-color:var(--accent);}
   .select-field option{background:var(--bg2);}

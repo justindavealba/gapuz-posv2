@@ -15,6 +15,7 @@ import Customers from './pages/Customers'
 import Refunds   from './pages/Refunds'
 import Returns   from './pages/Returns'
 import Staff     from './pages/Staff'
+import ActivityLog from './pages/ActivityLog'
 
 function Guard({ children, adminOnly=false }) {
   const { user, role } = useAuthStore()
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="refunds"   element={<Refunds/>}/>
             <Route path="returns"   element={<Returns/>}/>
             <Route path="staff"     element={<Guard adminOnly><Staff/></Guard>}/>
+            <Route path="activity-log" element={<Guard adminOnly><ActivityLog/></Guard>}/>
           </Route>
           <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>

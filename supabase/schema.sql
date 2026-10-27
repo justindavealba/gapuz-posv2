@@ -148,6 +148,20 @@ INSERT INTO categories (name, badge_color, sort_order) VALUES
 ('Accessories', 'badge-orange', 7),
 ('Services',    'badge-green',  8);
 
+-- 9. ACTIVITY LOG (who did what — refunds processed, products deleted, staff
+--    suspended, etc. No UPDATE/DELETE policies on purpose, so entries can't
+--    be altered or removed through the app once written.)
+CREATE TABLE activity_log (
+  log_id       SERIAL PRIMARY KEY,
+  actor_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_name   VARCHAR(100) NOT NULL,
+  action       VARCHAR(20)  NOT NULL,
+  entity_type  VARCHAR(20)  NOT NULL,
+  entity_label VARCHAR(150),
+  details      JSONB,
+  created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ROW LEVEL SECURITY
 ALTER TABLE profiles          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products          ENABLE ROW LEVEL SECURITY;
@@ -157,6 +171,7 @@ ALTER TABLE transaction_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refunds           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE holds             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_log      ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated read" ON profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON products FOR SELECT TO authenticated USING (true);
@@ -166,6 +181,8 @@ CREATE POLICY "Allow authenticated read" ON transaction_items FOR SELECT TO auth
 CREATE POLICY "Allow authenticated read" ON refunds FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON holds FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow authenticated read" ON categories FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can read activity log" ON activity_log FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
 
 CREATE POLICY "Allow authenticated insert" ON transactions FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON transaction_items FOR INSERT TO authenticated WITH CHECK (true);
@@ -174,6 +191,7 @@ CREATE POLICY "Allow authenticated insert" ON customers FOR INSERT TO authentica
 CREATE POLICY "Allow authenticated insert" ON products FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON holds FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Allow authenticated insert" ON categories FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Allow authenticated insert" ON activity_log FOR INSERT TO authenticated WITH CHECK (true);
 
 CREATE POLICY "Allow authenticated update" ON products FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Allow authenticated update" ON customers FOR UPDATE TO authenticated USING (true);
@@ -194,6 +212,7 @@ CREATE INDEX idx_transaction_items_prod  ON transaction_items(product_id);
 CREATE INDEX idx_refunds_transaction     ON refunds(transaction_id);
 CREATE INDEX idx_refunds_status          ON refunds(status);
 CREATE INDEX idx_products_category       ON products(category);
+CREATE INDEX idx_activity_log_created_at ON activity_log(created_at);
 
 -- VIEWS
 -- security_invoker = true makes each view run with the querying user's own

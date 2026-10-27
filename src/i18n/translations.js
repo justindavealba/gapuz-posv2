@@ -122,6 +122,14 @@ export const translations = {
     confirm_delete_staff: 'This permanently deletes the account and can\'t be undone.',
     staff_deleted:  'Account deleted',
 
+    // Activity Log
+    activity_log:   'Activity Log',
+    search_logs:    'Search activity...',
+    actor:          'User',
+    entity:         'Item',
+    when:           'When',
+    no_logs:        'No activity yet',
+
     // Reports
     today:          'Today',
     this_week:      'This Week',
@@ -315,6 +323,14 @@ export const translations = {
     role_change_warning: 'Agad magkakabisa ang pagbabago ng role pagkatapos i-save.',
     confirm_delete_staff: 'Permanenteng mabubura ang account na ito at hindi na maibabalik.',
     staff_deleted:  'Nabura ang account',
+
+    // Activity Log
+    activity_log:   'Talaan ng Aktibidad',
+    search_logs:    'Maghanap ng aktibidad...',
+    actor:          'Gumawa',
+    entity:         'Item',
+    when:           'Kailan',
+    no_logs:        'Walang aktibidad pa',
 
     // Reports
     today:          'Ngayon',

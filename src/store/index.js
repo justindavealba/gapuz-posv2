@@ -32,20 +32,14 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error || !data.user) return false
+    if (error || !data.user) return { ok: false, error }
     await get()._loadProfile(data.user)
-    return true
+    return { ok: true, error: null }
   },
 
   logout: async () => {
     await supabase.auth.signOut()
     set({ user: null, role: null })
-  },
-
-  checkEmailExists: async (email) => {
-    const { data, error } = await supabase.functions.invoke('check-email', { body: { email: email.trim() } })
-    if (error) return { exists: null, error }
-    return { exists: !!data?.exists, error: null }
   },
 
   requestPasswordReset: async (email) => {
@@ -76,6 +70,60 @@ export const useAuthStore = create((set, get) => ({
       if (error) return { error }
     }
     await get()._loadProfile(user)
+    return { error: null }
+  },
+}))
+
+// ── STAFF STORE (profiles — admin manages cashier accounts) ───────
+const STAFF_SELECT = 'id, name, email, role, active, createdAt:created_at'
+
+export const useStaffStore = create((set, get) => ({
+  staff: [],
+  loading: false,
+
+  fetchStaff: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase.from('profiles').select(STAFF_SELECT).order('created_at')
+    if (!error) set({ staff: data, loading: false })
+    else set({ loading: false })
+  },
+
+  addCashier: async ({ name, email, password }) => {
+    const { data, error } = await supabase.functions.invoke('create-cashier', {
+      body: { name: name.trim(), email: email.trim(), password },
+    })
+    if (error) {
+      const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)
+      return { error: { message: serverMsg || error.message } }
+    }
+    if (data?.error) return { error: { message: data.error } }
+    await get().fetchStaff()
+    return { error: null }
+  },
+
+  updateStaff: async ({ id, name, email, password }) => {
+    const { data, error } = await supabase.functions.invoke('update-staff', {
+      body: { id, name: name.trim(), email: email.trim(), password: password?.trim() || undefined },
+    })
+    if (error) {
+      const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)
+      return { error: { message: serverMsg || error.message } }
+    }
+    if (data?.error) return { error: { message: data.error } }
+    await get().fetchStaff()
+    return { error: null }
+  },
+
+  toggleStaffStatus: async ({ id, active }) => {
+    const { data, error } = await supabase.functions.invoke('toggle-staff-status', {
+      body: { id, active },
+    })
+    if (error) {
+      const serverMsg = await error.context?.json?.().then(j => j?.error).catch(() => null)
+      return { error: { message: serverMsg || error.message } }
+    }
+    if (data?.error) return { error: { message: data.error } }
+    await get().fetchStaff()
     return { error: null }
   },
 }))

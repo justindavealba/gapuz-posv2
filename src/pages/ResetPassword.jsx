@@ -4,6 +4,12 @@ import { useAuthStore } from '../store'
 import { useToast } from '../utils/toast'
 import { supabase } from '../lib/supabaseClient'
 
+// Module-scoped so the exchange survives React StrictMode's dev-only double
+// effect invocation (mount → cleanup → remount) — without this, the second
+// invocation re-sends the same one-time code, which Supabase has already
+// consumed, and reports the link as invalid even though it was never actually bad.
+let exchangeInFlight = null
+
 export default function ResetPassword() {
   const [password, setPassword]               = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -21,7 +27,12 @@ export default function ResetPassword() {
     const finish = (ok) => { if (!settled) { settled = true; setStatus(ok ? 'ready' : 'invalid') } }
 
     const code = new URLSearchParams(window.location.search).get('code')
-    if (code) supabase.auth.exchangeCodeForSession(code).then(({ error }) => finish(!error))
+    if (code) {
+      if (!exchangeInFlight || exchangeInFlight.code !== code) {
+        exchangeInFlight = { code, promise: supabase.auth.exchangeCodeForSession(code) }
+      }
+      exchangeInFlight.promise.then(({ error }) => finish(!error))
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) finish(true)

@@ -9,6 +9,7 @@ export const translations = {
     refunds:    'Refunds',
     logout:     'Logout',
     returns:    'Returns',
+    staff_accounts: 'Staff Accounts',
 
     // Profile menu
     edit_profile:    'Change Password',
@@ -98,6 +99,24 @@ export const translations = {
     product_deleted:'Product deleted',
     restocked:      'Restocked',
 
+    // Staff
+    add_cashier:    'Add Cashier',
+    edit_staff:     'Edit Staff Account',
+    cashier_added:  'Cashier account created',
+    staff_updated:  'Account updated',
+    confirm_password: 'Confirm Password',
+    new_password_optional: 'New Password (optional)',
+    leave_blank_pw: 'Leave blank to keep the current password',
+    create_account: 'Create Account',
+    save_changes:   'Save Changes',
+    active:         'Active',
+    suspended:      'Suspended',
+    suspend:        'Suspend',
+    reactivate:     'Reactivate',
+    confirm_suspend: 'Suspend this account? They won\'t be able to log in until reactivated.',
+    staff_suspended: 'Account suspended',
+    staff_reactivated: 'Account reactivated',
+
     // Reports
     today:          'Today',
     this_week:      'This Week',
@@ -179,6 +198,7 @@ export const translations = {
     refunds:    'Mga Refund',
     logout:     'Mag-logout',
     returns:    'Mga Return',
+    staff_accounts: 'Mga Account ng Staff',
 
     // Profile menu
     edit_profile:    'Palitan ang Password',
@@ -267,6 +287,24 @@ export const translations = {
     product_updated:'Na-update ang produkto',
     product_deleted:'Nabura ang produkto',
     restocked:      'Na-restock',
+
+    // Staff
+    add_cashier:    'Magdagdag ng Cashier',
+    edit_staff:     'I-edit ang Account ng Staff',
+    cashier_added:  'Nagawa ang account ng cashier',
+    staff_updated:  'Na-update ang account',
+    confirm_password: 'Kumpirmahin ang Password',
+    new_password_optional: 'Bagong Password (opsyonal)',
+    leave_blank_pw: 'Iwanang blangko para panatilihin ang kasalukuyang password',
+    create_account: 'Gumawa ng Account',
+    save_changes:   'I-save ang mga Pagbabago',
+    active:         'Aktibo',
+    suspended:      'Suspendido',
+    suspend:        'I-suspinde',
+    reactivate:     'I-reactivate',
+    confirm_suspend: 'Suspindihin ang account na ito? Hindi sila makakapag-login hanggang ma-reactivate.',
+    staff_suspended: 'Na-suspinde ang account',
+    staff_reactivated: 'Na-reactivate ang account',
 
     // Reports
     today:          'Ngayon',

@@ -1,11 +1,13 @@
 // Supabase Edge Function: send-receipt
-// Emails a transaction receipt to a customer via Gmail SMTP. The Gmail app
-// password must never reach the browser, so this call is proxied through here.
+// Emails a transaction receipt to a customer via Brevo's SMTP relay. The
+// SMTP key must never reach the browser, so this call is proxied through here.
 // The frontend calls this via supabase.functions.invoke('send-receipt', {...}).
 //
-// Requires these secrets:
-//   supabase secrets set GMAIL_USER=youraccount@gmail.com
-//   supabase secrets set GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
+// Requires these secrets (from Brevo dashboard → SMTP & API → SMTP tab):
+//   supabase secrets set BREVO_SMTP_LOGIN=youraccount@brevo-login.com
+//   supabase secrets set BREVO_SMTP_KEY=xxxxxxxxxxxxxxxx
+//   supabase secrets set SENDER_EMAIL=receipts@yourdomain.com
+// SENDER_EMAIL must be a verified sender in Brevo (Senders & IPs → Senders).
 // Deploy with:
 //   supabase functions deploy send-receipt
 
@@ -76,21 +78,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    const gmailUser = Deno.env.get('GMAIL_USER')
-    const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')
-    if (!gmailUser || !gmailPass) throw new Error('Gmail SMTP credentials are not configured')
+    const smtpLogin = Deno.env.get('BREVO_SMTP_LOGIN')
+    const smtpKey = Deno.env.get('BREVO_SMTP_KEY')
+    const senderEmail = Deno.env.get('SENDER_EMAIL')
+    if (!smtpLogin || !smtpKey || !senderEmail) throw new Error('Brevo SMTP credentials are not configured')
 
     const client = new SMTPClient({
       connection: {
-        hostname: 'smtp.gmail.com',
+        hostname: 'smtp-relay.brevo.com',
         port: 465,
         tls: true,
-        auth: { username: gmailUser, password: gmailPass },
+        auth: { username: smtpLogin, password: smtpKey },
       },
     })
 
     await client.send({
-      from: `Gapuz POS <${gmailUser}>`,
+      from: `Gapuz POS <${senderEmail}>`,
       to: email.trim(),
       subject: `Your Receipt — #${String(txn.id).padStart(4, '0')}`,
       html: receiptHtml(txn),

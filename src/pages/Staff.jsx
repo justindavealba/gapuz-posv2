@@ -1,0 +1,211 @@
+import { useState } from 'react'
+import { UserPlus, Pencil, X, User, Mail, Lock, Eye, EyeOff, UserX, UserCheck } from 'lucide-react'
+import { useStaffStore } from '../store'
+import { useToast } from '../utils/toast'
+import { useT, fmtDate } from '../utils/helpers'
+
+const EMPTY = { name:'', email:'', password:'', confirmPassword:'' }
+
+const AVATAR_COLORS = [
+  { bg: 'var(--accent)', fg: '#0a0a0a' },
+  { bg: 'var(--blue)',   fg: '#ffffff' },
+  { bg: 'var(--purple)', fg: '#ffffff' },
+  { bg: 'var(--yellow)', fg: '#0a0a0a' },
+  { bg: 'var(--red)',    fg: '#ffffff' },
+  { bg: 'var(--green)',  fg: '#ffffff' },
+  { bg: 'var(--orange)', fg: '#ffffff' },
+]
+const avatarColor = (seed) => {
+  let hash = 0
+  const s = String(seed)
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
+
+const FIELD_LABEL = { display:'block', fontSize:10, fontWeight:700, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }
+
+function IconInput({ icon:Icon, style, ...rest }) {
+  return (
+    <div style={{ position:'relative' }}>
+      <div style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', display:'flex', color:'var(--text3)' }}>
+        <Icon size={14}/>
+      </div>
+      <input className="input-field" style={{ paddingLeft:34, ...style }} {...rest}/>
+    </div>
+  )
+}
+
+function PasswordField({ value, onChange, placeholder, onEnter }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position:'relative' }}>
+      <IconInput icon={Lock} type={show?'text':'password'} value={value}
+                 onChange={onChange} placeholder={placeholder}
+                 style={{ paddingRight:36 }}
+                 onKeyDown={e=>e.key==='Enter'&&onEnter?.()}/>
+      <button type="button" onClick={()=>setShow(v=>!v)} aria-label={show?'Hide password':'Show password'}
+              style={{ position:'absolute', right:4, top:'50%', transform:'translateY(-50%)', width:28, height:28, border:'none', background:'transparent', color:'var(--text3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        {show ? <EyeOff size={15}/> : <Eye size={15}/>}
+      </button>
+    </div>
+  )
+}
+
+export default function Staff() {
+  const { staff, loading, addCashier, updateStaff, toggleStaffStatus } = useStaffStore()
+  const [modal,    setModal]    = useState(null) // 'add' | 'edit' | null
+  const [form,     setForm]     = useState(EMPTY)
+  const [selected, setSelected] = useState(null)
+  const [saving,   setSaving]   = useState(false)
+  const toast = useToast()
+  const t     = useT()
+
+  const openAdd    = () => { setForm(EMPTY); setModal('add') }
+  const openEdit   = (s) => { setForm({ name:s.name, email:s.email||'', password:'', confirmPassword:'' }); setSelected(s); setModal('edit') }
+  const closeModal = () => setModal(null)
+  const isAdd = modal === 'add'
+
+  const handleSave = async () => {
+    if (!form.name.trim())  return toast('Name is required', 'error')
+    if (!form.email.trim()) return toast('Email is required', 'error')
+    if (isAdd && (!form.password || form.password.length < 6)) return toast('Password must be at least 6 characters', 'error')
+    if (!isAdd && form.password && form.password.length < 6)   return toast('Password must be at least 6 characters', 'error')
+    if (form.password !== form.confirmPassword) return toast('Passwords do not match', 'error')
+
+    setSaving(true)
+    const { error } = isAdd
+      ? await addCashier(form)
+      : await updateStaff({ id: selected.id, name: form.name, email: form.email, password: form.password })
+    setSaving(false)
+    if (error) return toast(error.message || 'Could not save account', 'error')
+    toast(isAdd ? t('cashier_added') : t('staff_updated'), 'success')
+    closeModal()
+  }
+
+  const handleToggleStatus = async (s) => {
+    const makeActive = s.active === false
+    if (!makeActive && !window.confirm(t('confirm_suspend'))) return
+    const { error } = await toggleStaffStatus({ id: s.id, active: makeActive })
+    if (error) return toast(error.message || 'Could not update account status', 'error')
+    toast(makeActive ? t('staff_reactivated') : t('staff_suspended'), 'success')
+  }
+
+  return (
+    <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column',padding:20,gap:16}}>
+      <div className="page-header">
+        <div className="page-title" style={{display:'flex',alignItems:'center',gap:8}}>
+          <UserPlus size={18} style={{color:'var(--accent)'}}/>{t('staff_accounts')}
+        </div>
+        <button onClick={openAdd} className="btn-primary">+ {t('add_cashier')}</button>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto'}}>
+        <div className="tbl-wrap">
+          <table>
+            <thead><tr>{['Name','Email','Role','Status','Joined',''].map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {loading ? <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M21 12a9 9 0 1 1-9-9"/>
+                  </svg>
+                  {t('loading')}
+                </div>
+              </td></tr>
+              : staff.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>{t('no_data')}</td></tr>
+              : staff.map(s=>{
+                const ac = avatarColor(s.id)
+                const isSuspended = s.active === false
+                return (
+                <tr key={s.id} style={{opacity:isSuspended?0.55:1}}>
+                  <td><div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{width:30,height:30,borderRadius:8,background:ac.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:ac.fg,flexShrink:0}}>{s.name.charAt(0).toUpperCase()}</div>
+                    <span style={{fontWeight:600,fontSize:13,color:'var(--text)'}}>{s.name}</span>
+                  </div></td>
+                  <td style={{fontSize:12.5,color:'var(--text2)'}}>{s.email || '—'}</td>
+                  <td><span className={`badge ${s.role==='admin'?'badge-purple':'badge-accent'}`} style={{fontSize:10}}>{s.role==='admin'?'Admin':'Cashier'}</span></td>
+                  <td><span className={`badge ${isSuspended?'badge-red':'badge-green'}`} style={{fontSize:10}}>{isSuspended?t('suspended'):t('active')}</span></td>
+                  <td style={{fontSize:12,color:'var(--text2)'}}>{fmtDate(s.createdAt)}</td>
+                  <td style={{textAlign:'right'}}>
+                    <div style={{display:'inline-flex',gap:5}}>
+                      <button onClick={()=>openEdit(s)} className="btn-secondary" style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4}}>
+                        <Pencil size={11}/>{t('edit')}
+                      </button>
+                      {s.role==='cashier' && (
+                        <button onClick={()=>handleToggleStatus(s)} className={isSuspended?'btn-success':'btn-danger'} style={{fontSize:10,padding:'4px 10px',display:'inline-flex',alignItems:'center',gap:4}}>
+                          {isSuspended ? <UserCheck size={11}/> : <UserX size={11}/>}{isSuspended?t('reactivate'):t('suspend')}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {(modal==='add'||modal==='edit') && (
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}} onClick={e=>e.target===e.currentTarget&&closeModal()}>
+          <div className="card animate-scale-in" style={{width:'min(420px,92vw)',padding:0,overflow:'hidden'}}>
+
+            {/* Header */}
+            <div style={{padding:'22px 26px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{width:38,height:38,borderRadius:10,background: isAdd ? 'rgba(34,197,94,0.12)' : 'rgba(59,130,246,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  {isAdd ? <UserPlus size={17} style={{color:'var(--green)'}}/> : <Pencil size={16} style={{color:'var(--blue)'}}/>}
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)'}}>{isAdd ? t('add_cashier') : t('edit_staff')}</div>
+                  <div style={{fontSize:11.5,color:'var(--text3)',marginTop:1}}>{isAdd ? 'Create a new cashier login' : selected?.name}</div>
+                </div>
+              </div>
+              <button onClick={closeModal} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',padding:4,display:'flex',borderRadius:6}}><X size={18}/></button>
+            </div>
+
+            {/* Body */}
+            <div style={{padding:'22px 26px',display:'flex',flexDirection:'column',gap:16}}>
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div>
+                  <label style={FIELD_LABEL}>{t('full_name')} *</label>
+                  <IconInput icon={User} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Juan dela Cruz"/>
+                </div>
+                <div>
+                  <label style={FIELD_LABEL}>{t('email_addr')} *</label>
+                  <IconInput icon={Mail} type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="cashier@email.com"/>
+                </div>
+              </div>
+
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{flex:1,height:1,background:'var(--border)'}}/>
+                <span style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.6px'}}>Security</span>
+                <div style={{flex:1,height:1,background:'var(--border)'}}/>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div>
+                  <label style={FIELD_LABEL}>{isAdd ? `${t('password')} *` : t('new_password_optional')}</label>
+                  <PasswordField value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))}
+                                 placeholder={isAdd ? 'At least 6 characters' : t('leave_blank_pw')} onEnter={handleSave}/>
+                </div>
+                <div>
+                  <label style={FIELD_LABEL}>{t('confirm_password')}{isAdd ? ' *' : ''}</label>
+                  <PasswordField value={form.confirmPassword} onChange={e=>setForm(f=>({...f,confirmPassword:e.target.value}))}
+                                 placeholder="Re-enter password" onEnter={handleSave}/>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{display:'flex',gap:10,padding:'16px 26px',borderTop:'1px solid var(--border)',justifyContent:'flex-end'}}>
+              <button onClick={closeModal} disabled={saving} className="btn-secondary">{t('cancel')}</button>
+              <button onClick={handleSave} disabled={saving} className="btn-primary">
+                {saving ? 'Saving...' : (isAdd ? t('create_account') : t('save_changes'))}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

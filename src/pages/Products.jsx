@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Package, Camera, Plus, Pencil, AlertTriangle, TrendingUp, Tags, X, Check } from 'lucide-react'
 import { useProductStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, peso, stockStatus, genBarcode, BADGE_SWATCHES } from '../utils/helpers'
+import { useT, peso, stockStatus, genBarcode, categoryIcon, BADGE_SWATCHES } from '../utils/helpers'
 
 const EMPTY = { name:'', category:'', price:'', costPrice:'', stock:'', barcode:'', image:'' }
 
@@ -174,9 +174,17 @@ export default function Products() {
                   <td style={{width:56}}>
                     {p.image && (p.image.startsWith('data:') || p.image.startsWith('http')) ? (
                       <img src={p.image} style={{width:44,height:44,borderRadius:8,objectFit:'cover',border:'1px solid var(--border2)'}} alt=""/>
-                    ) : (
-                      <div style={{width:44,height:44,borderRadius:8,background:'var(--bg3)',border:'1px solid var(--border2)',display:'flex',alignItems:'center',justifyContent:'center',color:mutedText}}>{p.image || p.icon || <Package size={18}/>}</div>
-                    )}
+                    ) : p.image || p.icon ? (
+                      <div style={{width:44,height:44,borderRadius:8,background:'var(--bg3)',border:'1px solid var(--border2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:mutedText}}>{p.image || p.icon}</div>
+                    ) : (() => {
+                      const CatIcon = categoryIcon(p.category)
+                      const hex = BADGE_SWATCHES.find(s=>s.cls===catBadge(p.category))?.hex || '#34d399'
+                      return (
+                        <div style={{width:44,height:44,borderRadius:8,background:`${hex}1a`,border:`1px solid ${hex}40`,display:'flex',alignItems:'center',justifyContent:'center',color:hex}}>
+                          <CatIcon size={19}/>
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td><div style={{fontWeight:600,fontSize:13,color:'var(--text)'}}>{p.name}</div><div style={{fontSize:11.5,color:'var(--text2)',fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{p.barcode}</div></td>
                   <td><span className={`badge ${catBadge(p.category)}`} style={{fontSize:10}}>{p.category}</span></td>

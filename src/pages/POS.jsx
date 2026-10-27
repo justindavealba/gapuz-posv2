@@ -2,11 +2,11 @@ import { useState, useRef, useCallback } from 'react'
 import { Package, PauseCircle } from 'lucide-react'
 import { useCartStore, useHoldStore, useProductStore, useCustomerStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, useKeyboardShortcuts, useBreakpoint, peso, stockStatus } from '../utils/helpers'
+import { useT, useKeyboardShortcuts, useBreakpoint, peso, stockStatus, categoryIcon, BADGE_SWATCHES } from '../utils/helpers'
 import Cart from '../components/Cart'
 
-function ProductCard({ product, onAdd, isLight, bodyText }) {
-  const { stock, name, image, icon, price } = product
+function ProductCard({ product, onAdd, isLight, bodyText, catColor }) {
+  const { stock, name, image, icon, price, category } = product
   const isOut = stock === 0
   const isLow = stock > 0 && stock <= 5
   const mutedText = isLight ? '#4b5563' : 'var(--text3)'
@@ -26,9 +26,12 @@ function ProductCard({ product, onAdd, isLight, bodyText }) {
       <div style={{width:'100%', height:80, background:'var(--bg3)', borderRadius:8, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', border:'1px solid var(--border2)'}}>
         {image && (image.startsWith('data:') || image.startsWith('http')) ? (
           <img src={image} style={{width:'100%', height:'100%', objectFit:'cover'}} alt=""/>
-        ) : (
-          <span style={{fontSize:32}}>{image || icon || <Package size={28} color="var(--text3)"/>}</span>
-        )}
+        ) : image || icon ? (
+          <span style={{fontSize:32}}>{image || icon}</span>
+        ) : (() => {
+          const CatIcon = categoryIcon(category)
+          return <CatIcon size={28} color={catColor}/>
+        })()}
       </div>
       <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:6,lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:34}}>{name}</div>
       <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:700,color:bodyText}}>{peso(price)}</div>
@@ -49,6 +52,7 @@ export default function POS() {
   const customers  = useCustomerStore(s=>s.customers)
   const categories = useCategoryStore(s=>s.categories)
   const CATEGORIES = ['All', ...categories.map(c=>c.name)]
+  const catHex = (name) => BADGE_SWATCHES.find(s=>s.cls===(categories.find(c=>c.name===name)?.badgeColor||'badge-accent'))?.hex || '#34d399'
   const { theme }    = useAppStore()
   const { items, addItem, clearCart, setCustomer } = useCartStore()
   const { holds, removeHold, saveHold } = useHoldStore()
@@ -149,7 +153,7 @@ export default function POS() {
           : filtered.length===0
             ? <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:mutedText,gap:8}}><Package size={36} style={{opacity:.2}}/><span>{t('no_data')}</span></div>
             : <div style={{display:'grid',gap:10,gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?120:148}px,1fr))`,alignContent:'start'}}>
-                {filtered.map(p=><ProductCard key={p.id} product={p} onAdd={handleAdd} isLight={isLight} bodyText={bodyText}/>)}
+                {filtered.map(p=><ProductCard key={p.id} product={p} onAdd={handleAdd} isLight={isLight} bodyText={bodyText} catColor={catHex(p.category)}/>)}
               </div>
           }
         </div>

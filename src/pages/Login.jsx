@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { useToast } from '../utils/toast'
 import { useT, useBreakpoint } from '../utils/helpers'
+import LoginSkeleton from '../components/LoginSkeleton'
 
 const DecorIcon = ({ children, size, style }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"
@@ -66,31 +67,39 @@ export default function Login() {
   const [forgotOpen, setForgotOpen]     = useState(false)
   const [resetEmail, setResetEmail]     = useState('')
   const [resetLoading, setResetLoading] = useState(false)
-  const { login, requestPasswordReset, checkEmailExists } = useAuthStore()
+  const [pageLoading, setPageLoading]   = useState(true)
+  const { login, requestPasswordReset } = useAuthStore()
   const navigate = useNavigate()
   const toast    = useToast()
   const t        = useT()
   const { isMobile } = useBreakpoint()
 
+  useEffect(()=>{ const timer = setTimeout(()=>setPageLoading(false), 300); return ()=>clearTimeout(timer) },[])
+
+  if (pageLoading) return <LoginSkeleton/>
+
   const handleLogin = async (u = username, p = password) => {
     if (!u || !p) return toast('Please enter your email and password', 'error')
     setLoading(true)
-    const ok = await login(u, p)
+    const { ok, error } = await login(u, p)
     if (ok) { toast('Welcome back!', 'success'); navigate('/pos') }
-    else    { toast('Invalid email or password', 'error') }
+    else if (error?.message?.toLowerCase().includes('banned')) {
+      toast('This account has been suspended. Contact your administrator.', 'error')
+    } else {
+      toast('Invalid email or password', 'error')
+    }
     setLoading(false)
   }
 
-  const openForgot = () => { setResetEmail(username); setForgotOpen(true) }
+  const openForgot = () => { setResetEmail(''); setForgotOpen(true) }
 
   const handleForgotSubmit = async () => {
     if (!resetEmail.trim()) return toast('Please enter your email', 'error')
     setResetLoading(true)
 
-    const { exists, error: checkError } = await checkEmailExists(resetEmail)
-    if (checkError) { setResetLoading(false); return toast(checkError.message || 'Could not verify email', 'error') }
-    if (!exists) { setResetLoading(false); return toast('This email is not registered in our system', 'error') }
-
+    // Always proceed the same way whether or not the email is registered —
+    // Supabase silently no-ops resetPasswordForEmail for unknown emails rather
+    // than erroring, so this never reveals which emails have accounts.
     const { error } = await requestPasswordReset(resetEmail)
     setResetLoading(false)
     if (error) return toast(error.message || 'Could not send reset email', 'error')
@@ -164,6 +173,7 @@ export default function Login() {
             <path d="M60,0 C135,25 5,75 60,100 L140,100 L140,0 Z" style={{ fill:'var(--bg2)' }}/>
           </svg>
         )}
+
 
         <div style={{ width:'100%', maxWidth:340 }}>
 

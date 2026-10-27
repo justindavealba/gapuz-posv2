@@ -12,7 +12,9 @@
 CREATE TABLE profiles (
   id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name       VARCHAR(100) NOT NULL,
+  email      VARCHAR(100),
   role       VARCHAR(20)  NOT NULL DEFAULT 'cashier' CHECK (role IN ('admin','cashier')),
+  active     BOOLEAN      NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

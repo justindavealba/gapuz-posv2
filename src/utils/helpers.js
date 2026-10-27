@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+import {
+  Cpu, CircuitBoard, MemoryStick, HardDrive, Laptop, Monitor, Keyboard, Mouse,
+  Headphones, Webcam, Printer, Router, Usb, Cable, Fan, BatteryCharging,
+  Gamepad2, Smartphone, Tablet, Wrench, Package,
+} from 'lucide-react'
 import { useAppStore } from '../store'
 import { translations } from '../i18n/translations'
 
@@ -22,7 +27,38 @@ export const getTier = (points) => {
   return                  {label:'Bronze',  color:'#b45309',icon:'🥉'}
 }
 
-export const REFUND_REASONS = ['Defective product','Wrong item delivered','Customer changed mind','Item not as described','Duplicate purchase','Other']
+// Fallback icon shown for a product with no uploaded image/emoji — matched by
+// keyword against the category name so custom categories still get a sensible
+// icon instead of the generic box. Order matters: more specific rules first.
+const CATEGORY_ICON_RULES = [
+  [['processor','cpu'], Cpu],
+  [['gpu','graphics','motherboard','mobo','circuit'], CircuitBoard],
+  [['ram','memory'], MemoryStick],
+  [['storage','ssd','hdd','drive'], HardDrive],
+  [['laptop','notebook'], Laptop],
+  [['monitor','display','screen'], Monitor],
+  [['keyboard'], Keyboard],
+  [['mouse','peripheral'], Mouse],
+  [['headphone','headset','audio','speaker'], Headphones],
+  [['webcam','camera'], Webcam],
+  [['printer'], Printer],
+  [['network','router','wifi'], Router],
+  [['usb','flash'], Usb],
+  [['cable','adapter','accessor'], Cable],
+  [['fan','cooling','cooler'], Fan],
+  [['battery','power','psu'], BatteryCharging],
+  [['gaming','console','controller'], Gamepad2],
+  [['phone','mobile'], Smartphone],
+  [['tablet'], Tablet],
+  [['service','repair'], Wrench],
+]
+export const categoryIcon = (categoryName) => {
+  const name = (categoryName||'').toLowerCase()
+  const match = CATEGORY_ICON_RULES.find(([keywords])=>keywords.some(k=>name.includes(k)))
+  return match ? match[1] : Package
+}
+
+export const REFUND_REASONS =['Defective product','Wrong item delivered','Customer changed mind','Item not as described','Duplicate purchase','Other']
 
 // Categories now live in the `categories` table (see useCategoryStore) so admins can
 // add/remove them from the UI. This is just the picker palette for a new category's badge.

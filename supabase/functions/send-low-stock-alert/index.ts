@@ -22,7 +22,7 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
 
-const LOGO_URL = 'https://gapuzpos.vercel.app/logo.png'
+const LOGO_URL = 'https://gapuzpos.vercel.app/logo.jpg'
 const APP_URL = 'https://gapuzpos.vercel.app'
 
 function alertHtml(product: any) {

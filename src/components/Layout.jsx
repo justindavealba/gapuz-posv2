@@ -128,7 +128,7 @@ export default function Layout() {
           padding:'16px 14px', borderBottom:'1px solid var(--border)',
           minHeight:64, flexShrink:0,
         }}>
-          <img src="/logo.png" alt="Logo" style={{ width:34, height:34, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}/>
+          <img src="/logo.jpg" alt="Logo" style={{ width:34, height:34, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}/>
           <div style={{ overflow:'hidden', flex:1 }}>
             <div style={{ fontSize:13, fontWeight:800, color:'var(--accent)', letterSpacing:'-.2px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               GAPUZ POS

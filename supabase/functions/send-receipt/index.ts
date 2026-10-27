@@ -18,7 +18,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const LOGO_URL = 'https://gapuzpos.vercel.app/logo.png'
+const LOGO_URL = 'https://gapuzpos.vercel.app/logo.jpg'
 const peso = (n: number) => `₱${(n || 0).toFixed(2)}`
 
 function receiptHtml(txn: any) {

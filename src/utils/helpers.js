@@ -14,6 +14,28 @@ export const fmtDateTime = (d) => new Date(d).toLocaleString('en-PH',{month:'sho
 export const fmtTxnId = (id) => '#'+String(id).padStart(4,'0')
 export const genBarcode = () => 'BC-'+Date.now().toString(36).toUpperCase()
 
+// Downscales + re-encodes an uploaded image before it's stored as a base64 data
+// URL in the products table, so a raw phone-camera photo (often several MB)
+// doesn't bloat the DB — Supabase's free tier only gives 500MB of database space.
+export const resizeImage = (file, maxDim = 640, quality = 0.8) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onerror = () => reject(reader.error)
+  reader.onload = () => {
+    const img = new Image()
+    img.onerror = reject
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.src = reader.result
+  }
+  reader.readAsDataURL(file)
+})
+
 export const stockStatus = (stock) => {
   if(stock===0)  return {label:'Out of stock',cls:'badge-red',   color:'var(--red)',   bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.22)'}
   if(stock<=5)   return {label:`${stock} left`,cls:'badge-yellow',color:'var(--yellow)',bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.22)'}

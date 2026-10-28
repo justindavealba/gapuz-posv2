@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Package, Plus, Pencil, AlertTriangle, TrendingUp, Tags, X, Check, Sparkles } from 'lucide-react'
 import { useProductStore, useAppStore, useCategoryStore } from '../store'
 import { useToast } from '../utils/toast'
-import { useT, peso, stockStatus, genBarcode, categoryIcon, ICON_MAP, ICON_OPTIONS, BADGE_SWATCHES } from '../utils/helpers'
+import { useT, peso, stockStatus, genBarcode, categoryIcon, resizeImage, ICON_MAP, ICON_OPTIONS, BADGE_SWATCHES } from '../utils/helpers'
 import ProductThumb from '../components/ProductThumb'
 
 const EMPTY = { name:'', category:'', price:'', costPrice:'', stock:'', barcode:'', image:'' }
@@ -63,14 +63,14 @@ export default function Products() {
   const openEdit  = p  => { setForm({name:p.name,category:p.category,price:p.price,costPrice:p.costPrice||'',stock:p.stock,barcode:p.barcode||'',image:p.image||''}); setSelected(p); setModal('edit') }
   const openRestock = p => { setSelected(p); setRestockQty(''); setModal('restock') }
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setForm(f => ({ ...f, image: reader.result }))
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    try {
+      const dataUrl = await resizeImage(file)
+      setForm(f => ({ ...f, image: dataUrl }))
+    } catch {
+      toast('Could not read that image','error')
     }
   }
 
